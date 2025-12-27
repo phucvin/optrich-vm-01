@@ -173,6 +173,8 @@ bool Parser::takesImmediate(Opcode op) {
         case Opcode::BR:
         case Opcode::BR_IF:
         case Opcode::CALL:
+        case Opcode::BLOCK:
+        case Opcode::LOOP:
             return true;
         default:
             return false;
@@ -216,6 +218,13 @@ Opcode Parser::mapOpcode(const std::string& txt) {
         {"loop", Opcode::LOOP},
         {"br", Opcode::BR},
         {"br_if", Opcode::BR_IF},
+        {"end", Opcode::END},
+        {"i32.eq", Opcode::I32_EQ},
+        {"i32.ne", Opcode::I32_NE},
+        {"i32.lt_s", Opcode::I32_LT_S},
+        {"i32.gt_s", Opcode::I32_GT_S},
+        {"i32.le_s", Opcode::I32_LE_S},
+        {"i32.ge_s", Opcode::I32_GE_S},
         // Add more as needed
     };
     if (map.count(txt)) return map.at(txt);
