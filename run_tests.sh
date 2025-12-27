@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # List of test binaries
-TESTS=("test_lexer" "test_parser" "test_store" "test_integration" "test_array" "test_multi_module")
+TESTS=("test_lexer" "test_parser" "test_store" "test_integration" "test_array" "test_multi_module" "test_span")
 FAILED=0
 
 echo "Running tests..."

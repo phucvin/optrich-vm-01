@@ -1,0 +1,9 @@
+Allocated handle A: 1
+Allocated span B: 2
+Read from B (expected 42): 42
+Read from A (expected 99): 99
+Allocated chained span C: 3
+Read from A (expected 200): 200
+Caught expected OOB span creation: Span creation out of bounds
+Caught expected OOB access on span: Out of bounds object access
+SUCCESS
