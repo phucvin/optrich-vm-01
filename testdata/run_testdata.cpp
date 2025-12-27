@@ -33,6 +33,20 @@ WasmValue host_read_i32(MemoryStore* store, std::vector<WasmValue>& args) {
     return WasmValue(store->read<int32_t>(args[0].i32, args[1].i32));
 }
 
+WasmValue host_write_u8(MemoryStore* store, std::vector<WasmValue>& args) {
+    store->write<uint8_t>(args[0].i32, args[1].i32, static_cast<uint8_t>(args[2].i32));
+    return WasmValue();
+}
+
+WasmValue host_read_u8(MemoryStore* store, std::vector<WasmValue>& args) {
+    return WasmValue(static_cast<int32_t>(store->read<uint8_t>(args[0].i32, args[1].i32)));
+}
+
+WasmValue host_putchar(std::vector<WasmValue>& args) {
+    std::cout << (char)args[0].i32;
+    return WasmValue();
+}
+
 std::string readFile(const std::string& path) {
     std::ifstream t(path);
     if (!t.is_open()) throw std::runtime_error("Could not open file: " + path);
@@ -47,6 +61,9 @@ void registerStandardHostFunctions(Interpreter& vm, MemoryStore& store) {
     vm.registerHostFunction("env", "make_span", std::bind(host_make_span, &store, _1), {"i32", "i32", "i32"}, {"i32"});
     vm.registerHostFunction("env", "write_i32", std::bind(host_write_i32, &store, _1), {"i32", "i32", "i32"}, {});
     vm.registerHostFunction("env", "read_i32", std::bind(host_read_i32, &store, _1), {"i32", "i32"}, {"i32"});
+    vm.registerHostFunction("env", "write_u8", std::bind(host_write_u8, &store, _1), {"i32", "i32", "i32"}, {});
+    vm.registerHostFunction("env", "read_u8", std::bind(host_read_u8, &store, _1), {"i32", "i32"}, {"i32"});
+    vm.registerHostFunction("env", "putchar", host_putchar, {"i32"}, {});
 }
 
 void runTest(const fs::path& mainPath) {

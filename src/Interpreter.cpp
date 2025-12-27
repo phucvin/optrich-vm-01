@@ -214,6 +214,127 @@ void Interpreter::execute(Instruction& instr, StackFrame& frame) {
             }
             break;
         }
+        case Opcode::I32_EQ: {
+            int32_t b = pop().i32;
+            int32_t a = pop().i32;
+            push(WasmValue(a == b ? 1 : 0));
+            break;
+        }
+        case Opcode::I32_NE: {
+            int32_t b = pop().i32;
+            int32_t a = pop().i32;
+            push(WasmValue(a != b ? 1 : 0));
+            break;
+        }
+        case Opcode::I32_LT_S: {
+            int32_t b = pop().i32;
+            int32_t a = pop().i32;
+            push(WasmValue(a < b ? 1 : 0));
+            break;
+        }
+        case Opcode::I32_GT_S: {
+            int32_t b = pop().i32;
+            int32_t a = pop().i32;
+            push(WasmValue(a > b ? 1 : 0));
+            break;
+        }
+        case Opcode::I32_LE_S: {
+            int32_t b = pop().i32;
+            int32_t a = pop().i32;
+            push(WasmValue(a <= b ? 1 : 0));
+            break;
+        }
+        case Opcode::I32_GE_S: {
+            int32_t b = pop().i32;
+            int32_t a = pop().i32;
+            push(WasmValue(a >= b ? 1 : 0));
+            break;
+        }
+        case Opcode::BLOCK:
+        case Opcode::LOOP:
+        case Opcode::END:
+            // Just structural markers in flat mode
+            break;
+        case Opcode::BR:
+        case Opcode::BR_IF: {
+            bool shouldJump = true;
+            if (instr.opcode == Opcode::BR_IF) {
+                int32_t cond = pop().i32;
+                if (cond == 0) shouldJump = false;
+            }
+
+            if (shouldJump) {
+                std::string label = std::get<std::string>(instr.operand);
+                // Scan for label
+                // 1. Scan backwards for LOOP
+                int scanPC = frame.pc - 1; // start from current instruction
+                bool found = false;
+                while (scanPC >= 0) {
+                    Instruction& scanInstr = frame.func->body[scanPC];
+                    if (scanInstr.opcode == Opcode::LOOP &&
+                        std::holds_alternative<std::string>(scanInstr.operand) &&
+                        std::get<std::string>(scanInstr.operand) == label) {
+
+                        // Jump to instruction AFTER loop
+                        // Actually, wait. LOOP is just a marker.
+                        // If we jump to loop start, we re-execute LOOP opcode (no-op) and continue.
+                        // Yes.
+                        frame.pc = scanPC;
+                        found = true;
+                        break;
+                    }
+                    scanPC--;
+                }
+
+                if (!found) {
+                    // 2. Scan backwards for BLOCK to find its start?
+                    // No, BR to BLOCK means jump to END of block.
+                    // So we need to find the BLOCK instruction first to know it exists/matches?
+                    // Then find its matching END?
+                    // Actually, we just need to find the BLOCK with that label.
+                    // Scan backwards.
+                    scanPC = frame.pc - 1;
+                    int blockPC = -1;
+                    while (scanPC >= 0) {
+                         Instruction& scanInstr = frame.func->body[scanPC];
+                         if (scanInstr.opcode == Opcode::BLOCK &&
+                            std::holds_alternative<std::string>(scanInstr.operand) &&
+                            std::get<std::string>(scanInstr.operand) == label) {
+                             blockPC = scanPC;
+                             break;
+                         }
+                         scanPC--;
+                    }
+
+                    if (blockPC != -1) {
+                        // Found the block start. Now find the matching END.
+                        // Scan forward from blockPC.
+                        int depth = 0;
+                        int forwardPC = blockPC;
+                        while (forwardPC < (int)frame.func->body.size()) {
+                            Instruction& fInstr = frame.func->body[forwardPC];
+                            if (fInstr.opcode == Opcode::BLOCK || fInstr.opcode == Opcode::LOOP) {
+                                depth++;
+                            } else if (fInstr.opcode == Opcode::END) {
+                                depth--;
+                                if (depth == 0) {
+                                    // Found matching END
+                                    frame.pc = forwardPC + 1; // Execute instruction AFTER end
+                                    found = true;
+                                    break;
+                                }
+                            }
+                            forwardPC++;
+                        }
+                    }
+                }
+
+                if (!found) {
+                     throw std::runtime_error("Label not found: " + label);
+                }
+            }
+            break;
+        }
         default:
             break;
     }
