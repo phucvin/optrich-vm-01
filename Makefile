@@ -1,9 +1,12 @@
 CXX = g++
 CXXFLAGS = -std=c++17 -Iinclude -Wall -Wextra
 
-TARGETS = test_lexer test_parser test_store test_integration test_array
+TARGETS = test_lexer test_parser test_store test_integration test_array test_multi_module
 
 all: $(TARGETS)
+
+test_multi_module: tests/test_multi_module.cpp include/Interpreter.hpp include/Parser.hpp include/ObjectStore.hpp
+	$(CXX) $(CXXFLAGS) tests/test_multi_module.cpp -o test_multi_module
 
 test_lexer: tests/test_lexer.cpp include/Lexer.hpp
 	$(CXX) $(CXXFLAGS) tests/test_lexer.cpp -o test_lexer

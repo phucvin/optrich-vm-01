@@ -39,3 +39,11 @@
 
 # debug information files
 *.dwo
+
+# Project Test Binaries
+test_lexer
+test_parser
+test_store
+test_integration
+test_array
+test_multi_module
