@@ -31,7 +31,6 @@ void Parser::parseTopLevel(Module& mod) {
     expect(TokenType::LPAREN);
     Token t = consume();
     if (t.text != "module") {
-            // Treat as module anyway? No, strictly require (module ...
             throw std::runtime_error("Expected module");
     }
 
@@ -108,13 +107,11 @@ Function Parser::parseFunc() {
                 parseInstruction(func.body);
             }
         } else {
-            // Flat instruction
-            parseInstruction(func.body);
+            // Only S-expressions supported
+            throw std::runtime_error("Flat instructions are not supported. Found token: " + peek().text);
         }
     }
     expect(TokenType::RPAREN);
-    // Implicit return?
-    // func.body.push_back(Instruction(Opcode::END)); // Optional
     return func;
 }
 
@@ -125,14 +122,24 @@ void Parser::parseInstruction(std::vector<Instruction>& out) {
         Token opToken = consume();
         Opcode op = mapOpcode(opToken.text);
 
-        // Check if opcode takes immediate
-        if (takesImmediate(op)) {
+        // Special handling for Block/Loop to preserve structure
+        if (op == Opcode::BLOCK || op == Opcode::LOOP) {
+             Instruction instr = parseImmediate(op);
+             out.push_back(instr); // START
+
+             // Nested instructions
+             while (peek().type != TokenType::RPAREN) {
+                 parseInstruction(out);
+             }
+             expect(TokenType::RPAREN);
+             out.push_back(Instruction(Opcode::END)); // END
+        }
+        // Standard RPN for other instructions with immediates/operands
+        else if (takesImmediate(op)) {
             // The immediate is the next token(s)
-            // e.g. (i32.const 42) or (br $label)
             Instruction instr = parseImmediate(op);
 
             // Any subsequent tokens are nested instructions (operands)
-            // e.g. (br_if $label (i32.eq ...))
             while (peek().type != TokenType::RPAREN) {
                 parseInstruction(out);
             }
@@ -147,15 +154,7 @@ void Parser::parseInstruction(std::vector<Instruction>& out) {
             out.push_back(Instruction(op));
         }
     } else {
-        // Flat
-        Token opToken = consume();
-        Opcode op = mapOpcode(opToken.text);
-
-        if (takesImmediate(op)) {
-            out.push_back(parseImmediate(op));
-        } else {
-            out.push_back(Instruction(op));
-        }
+        throw std::runtime_error("Flat instructions are not supported. Found token: " + peek().text);
     }
 }
 
@@ -185,7 +184,6 @@ Instruction Parser::parseImmediate(Opcode op) {
     Token t = consume();
     if (op == Opcode::I32_CONST) return Instruction(op, (int32_t)std::stoi(t.text));
     if (op == Opcode::I64_CONST) return Instruction(op, (int64_t)std::stoll(t.text));
-    // f32/f64 ...
     if (op == Opcode::F32_CONST) return Instruction(op, std::stof(t.text));
     if (op == Opcode::F64_CONST) return Instruction(op, std::stod(t.text));
 
@@ -196,7 +194,7 @@ Instruction Parser::parseImmediate(Opcode op) {
         return Instruction(op, val); // Store as string, resolve later
     }
 
-    throw std::runtime_error("Invalid immediate for opcode");
+    throw std::runtime_error("Invalid immediate for opcode: " + t.text);
 }
 
 Opcode Parser::mapOpcode(const std::string& txt) {
@@ -225,37 +223,25 @@ Opcode Parser::mapOpcode(const std::string& txt) {
         {"i32.gt_s", Opcode::I32_GT_S},
         {"i32.le_s", Opcode::I32_LE_S},
         {"i32.ge_s", Opcode::I32_GE_S},
-        // Add more as needed
     };
     if (map.count(txt)) return map.at(txt);
-    // Fallback or ignore
     if (txt.find("store") != std::string::npos || txt.find("load") != std::string::npos) {
-            // For strict correctness based on prompt "doesn't support linear memory"
-            // But maybe "load" could be used if I mapped my ObjectStore to "memory" ...
-            // No, prompt said "host functions".
             throw std::runtime_error("Memory instructions not supported");
     }
     return Opcode::NOP;
 }
 
 void Parser::skipSExpr() {
-    int depth = 0; // We are called AFTER consuming the first ( ?
-    // My logic in parseTopLevel: consume(, check, then if unknown skipSExpr.
-    // I need to balance.
-    // Let's assume skipSExpr starts AT the first token inside.
-    // Actually, let's just make skipSExpr consume until balanced )
-    // If I called it after consuming `(`, depth=1.
-    depth = 1;
+    int depth = 1;
     while (depth > 0 && pos < tokens.size()) {
         Token t = consume();
         if (t.type == TokenType::LPAREN) depth++;
         if (t.type == TokenType::RPAREN) depth--;
     }
 }
+
 Import Parser::parseImport() {
     Import imp;
-    // We already consumed 'import'
-    // Format: "mod" "field" (func $alias ...
     Token modToken = consume();
     if (modToken.type != TokenType::STRING) throw std::runtime_error("Expected module name string");
     imp.module = modToken.text;
@@ -270,14 +256,12 @@ Import Parser::parseImport() {
         throw std::runtime_error("Only func imports are supported");
     }
 
-    // Optional identifier
     if (peek().type == TokenType::IDENTIFIER) {
         std::string val = consume().text;
         if (!val.empty() && val[0] == '$') val = val.substr(1);
         imp.alias = val;
     }
 
-    // Params and Results
     while (peek().type != TokenType::RPAREN) {
         expect(TokenType::LPAREN);
         Token inner = consume();
@@ -300,7 +284,7 @@ Import Parser::parseImport() {
              throw std::runtime_error("Unexpected token in import func type");
         }
     }
-    expect(TokenType::RPAREN); // close (func ...
-    expect(TokenType::RPAREN); // close (import ...
+    expect(TokenType::RPAREN);
+    expect(TokenType::RPAREN);
     return imp;
 }
