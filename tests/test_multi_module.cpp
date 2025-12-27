@@ -51,6 +51,11 @@ int main() {
         // z is at offset 0. Point2D starts at offset 4.
         std::string libCode = R"(
             (module
+                (import "env" "alloc" (func $env.alloc (param i32) (result i32)))
+                (import "env" "make_span" (func $env.make_span (param i32 i32 i32) (result i32)))
+                (import "env" "write_i32" (func $env.write_i32 (param i32 i32 i32)))
+                (import "env" "read_i32" (func $env.read_i32 (param i32 i32) (result i32)))
+
                 (func $point2d_init (param $h i32) (param $x i32) (param $y i32)
                     (call $env.write_i32 (local.get $h) (i32.const 0) (local.get $x))
                     (call $env.write_i32 (local.get $h) (i32.const 4) (local.get $y))
@@ -128,6 +133,13 @@ int main() {
         // Uses the library to do 3D math
         std::string mainCode = R"(
             (module
+                (import "lib" "point3d_new" (func $lib.point3d_new (param i32 i32 i32) (result i32)))
+                (import "lib" "point3d_add" (func $lib.point3d_add (param i32 i32)))
+                (import "lib" "point3d_as_point2d" (func $lib.point3d_as_point2d (param i32) (result i32)))
+                (import "lib" "point2d_get_x" (func $lib.point2d_get_x (param i32) (result i32)))
+                (import "lib" "point2d_get_y" (func $lib.point2d_get_y (param i32) (result i32)))
+                (import "lib" "point3d_get_z" (func $lib.point3d_get_z (param i32) (result i32)))
+
                 (func $run (result i32)
                     (local $p1 i32)
                     (local $p2 i32)
@@ -165,31 +177,31 @@ int main() {
 
         // 6. Register Host Functions for Library
         using namespace std::placeholders;
-        vm_lib.registerHostFunction("$env.alloc", std::bind(host_alloc, &store, _1), 1);
-        vm_lib.registerHostFunction("$env.make_span", std::bind(host_make_span, &store, _1), 3);
-        vm_lib.registerHostFunction("$env.write_i32", std::bind(host_write_i32, &store, _1), 3);
-        vm_lib.registerHostFunction("$env.read_i32", std::bind(host_read_i32, &store, _1), 2);
+        vm_lib.registerHostFunction("env", "alloc", std::bind(host_alloc, &store, _1), {"i32"}, {"i32"});
+        vm_lib.registerHostFunction("env", "make_span", std::bind(host_make_span, &store, _1), {"i32", "i32", "i32"}, {"i32"});
+        vm_lib.registerHostFunction("env", "write_i32", std::bind(host_write_i32, &store, _1), {"i32", "i32", "i32"}, {});
+        vm_lib.registerHostFunction("env", "read_i32", std::bind(host_read_i32, &store, _1), {"i32", "i32"}, {"i32"});
 
         // 7. Register "Library" Functions for Main
         // Point2D functions
-        vm_main.registerHostFunction("$lib.point2d_new",
-            [&](std::vector<WasmValue>& args) { return vm_lib.run("$point2d_new", args); }, 2);
-        vm_main.registerHostFunction("$lib.point2d_add",
-            [&](std::vector<WasmValue>& args) { return vm_lib.run("$point2d_add", args); }, 2);
-        vm_main.registerHostFunction("$lib.point2d_get_x",
-            [&](std::vector<WasmValue>& args) { return vm_lib.run("$point2d_get_x", args); }, 1);
-        vm_main.registerHostFunction("$lib.point2d_get_y",
-            [&](std::vector<WasmValue>& args) { return vm_lib.run("$point2d_get_y", args); }, 1);
+        // Note: Main only imports what it needs.
+        // But we must register them.
 
         // Point3D functions
-        vm_main.registerHostFunction("$lib.point3d_new",
-            [&](std::vector<WasmValue>& args) { return vm_lib.run("$point3d_new", args); }, 3);
-        vm_main.registerHostFunction("$lib.point3d_add",
-            [&](std::vector<WasmValue>& args) { return vm_lib.run("$point3d_add", args); }, 2);
-        vm_main.registerHostFunction("$lib.point3d_get_z",
-            [&](std::vector<WasmValue>& args) { return vm_lib.run("$point3d_get_z", args); }, 1);
-        vm_main.registerHostFunction("$lib.point3d_as_point2d",
-            [&](std::vector<WasmValue>& args) { return vm_lib.run("$point3d_as_point2d", args); }, 1);
+        vm_main.registerHostFunction("lib", "point3d_new",
+            [&](std::vector<WasmValue>& args) { return vm_lib.run("$point3d_new", args); }, {"i32", "i32", "i32"}, {"i32"});
+        vm_main.registerHostFunction("lib", "point3d_add",
+            [&](std::vector<WasmValue>& args) { return vm_lib.run("$point3d_add", args); }, {"i32", "i32"}, {});
+        vm_main.registerHostFunction("lib", "point3d_get_z",
+            [&](std::vector<WasmValue>& args) { return vm_lib.run("$point3d_get_z", args); }, {"i32"}, {"i32"});
+        vm_main.registerHostFunction("lib", "point3d_as_point2d",
+            [&](std::vector<WasmValue>& args) { return vm_lib.run("$point3d_as_point2d", args); }, {"i32"}, {"i32"});
+
+        // Helper accessors for point2d (x, y) which we invoke on the span
+        vm_main.registerHostFunction("lib", "point2d_get_x",
+            [&](std::vector<WasmValue>& args) { return vm_lib.run("$point2d_get_x", args); }, {"i32"}, {"i32"});
+        vm_main.registerHostFunction("lib", "point2d_get_y",
+            [&](std::vector<WasmValue>& args) { return vm_lib.run("$point2d_get_y", args); }, {"i32"}, {"i32"});
 
 
         // 8. Execute Main
