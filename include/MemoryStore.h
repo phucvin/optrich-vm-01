@@ -6,6 +6,7 @@
 #include <iostream>
 #include <variant>
 #include <cstring> // for memcpy
+#include <algorithm> // for std::fill
 
 // Basic Wasm Values
 // Note: In a real engine we might use a union or std::variant.
@@ -26,24 +27,15 @@ struct WasmValue {
     explicit WasmValue(double v) : type(F64), f64(v) {}
 };
 
-class ObjectStore {
+class MemoryStore {
 public:
     // Handle 0 is usually null/invalid, but let's just use 0-based index.
     // If we want to detect null, we can start from 1. Let's start from 1.
     using Handle = int32_t;
 
-    ObjectStore() {
-        // Reserve index 0 as null/invalid
-        objects.emplace_back();
-    }
+    MemoryStore();
 
-    Handle alloc(int32_t size) {
-        if (size < 0) throw std::runtime_error("Negative allocation size");
-        objects.emplace_back(size);
-        // Initialize with zeros? Wasm memory is zero-initialized.
-        std::fill(objects.back().begin(), objects.back().end(), 0);
-        return static_cast<Handle>(objects.size() - 1);
-    }
+    Handle alloc(int32_t size);
 
     // Generic read/write helper
     template <typename T>
@@ -67,12 +59,5 @@ public:
 private:
     std::vector<std::vector<uint8_t>> objects;
 
-    void validate_access(Handle handle, int32_t offset, size_t size) {
-        if (handle <= 0 || static_cast<size_t>(handle) >= objects.size()) {
-            throw std::runtime_error("Invalid object handle access");
-        }
-        if (offset < 0 || static_cast<size_t>(offset + size) > objects[handle].size()) {
-            throw std::runtime_error("Out of bounds object access");
-        }
-    }
+    void validate_access(Handle handle, int32_t offset, size_t size);
 };

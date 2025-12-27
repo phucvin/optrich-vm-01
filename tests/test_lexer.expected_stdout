@@ -1,0 +1,28 @@
+LPAREN
+KW: module
+LPAREN
+KW: func
+ID: $test
+LPAREN
+KW: param
+ID: $x
+KW: i32
+RPAREN
+LPAREN
+KW: result
+KW: i32
+RPAREN
+LPAREN
+KW: i32.add
+LPAREN
+KW: local.get
+ID: $x
+RPAREN
+LPAREN
+KW: i32.const
+INT: 42
+RPAREN
+RPAREN
+RPAREN
+RPAREN
+EOF

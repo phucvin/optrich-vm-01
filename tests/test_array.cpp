@@ -1,22 +1,23 @@
 #include <iostream>
-#include "Parser.hpp"
-#include "Interpreter.hpp"
-#include "ObjectStore.hpp"
+#include <cmath> // abs
+#include "Parser.h"
+#include "Interpreter.h"
+#include "MemoryStore.h"
 
 // Re-use host functions or simple version
-WasmValue h_alloc(ObjectStore* store, std::vector<WasmValue>& args) {
+WasmValue h_alloc(MemoryStore* store, std::vector<WasmValue>& args) {
     return WasmValue(store->alloc(args[0].i32));
 }
-WasmValue h_write_f64(ObjectStore* store, std::vector<WasmValue>& args) {
+WasmValue h_write_f64(MemoryStore* store, std::vector<WasmValue>& args) {
     store->write<double>(args[0].i32, args[1].i32, args[2].f64);
     return WasmValue();
 }
-WasmValue h_read_f64(ObjectStore* store, std::vector<WasmValue>& args) {
+WasmValue h_read_f64(MemoryStore* store, std::vector<WasmValue>& args) {
     return WasmValue(store->read<double>(args[0].i32, args[1].i32));
 }
 
 int main() {
-    ObjectStore store;
+    MemoryStore store;
 
     // Array of 2 doubles (16 bytes)
     // index 0 at offset 0, index 1 at offset 8
@@ -59,7 +60,7 @@ int main() {
     try {
         WasmValue res = vm.run("$test_array", {});
         std::cout << "Result: " << res.f64 << std::endl;
-        if (abs(res.f64 - 3.3) < 0.0001) return 0;
+        if (std::abs(res.f64 - 3.3) < 0.0001) return 0;
         else return 1;
     } catch (const std::exception& e) {
         std::cerr << e.what() << std::endl;

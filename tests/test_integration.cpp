@@ -1,16 +1,16 @@
 #include <iostream>
-#include "Parser.hpp"
-#include "Interpreter.hpp"
-#include "ObjectStore.hpp"
+#include "Parser.h"
+#include "Interpreter.h"
+#include "MemoryStore.h"
 
 // Demo Host Functions
-WasmValue host_alloc(ObjectStore* store, std::vector<WasmValue>& args) {
+WasmValue host_alloc(MemoryStore* store, std::vector<WasmValue>& args) {
     int32_t size = args[0].i32;
     int32_t handle = store->alloc(size);
     return WasmValue(handle);
 }
 
-WasmValue host_write_i32(ObjectStore* store, std::vector<WasmValue>& args) {
+WasmValue host_write_i32(MemoryStore* store, std::vector<WasmValue>& args) {
     int32_t handle = args[0].i32;
     int32_t offset = args[1].i32;
     int32_t val = args[2].i32;
@@ -18,7 +18,7 @@ WasmValue host_write_i32(ObjectStore* store, std::vector<WasmValue>& args) {
     return WasmValue();
 }
 
-WasmValue host_read_i32(ObjectStore* store, std::vector<WasmValue>& args) {
+WasmValue host_read_i32(MemoryStore* store, std::vector<WasmValue>& args) {
     int32_t handle = args[0].i32;
     int32_t offset = args[1].i32;
     int32_t val = store->read<int32_t>(handle, offset);
@@ -32,7 +32,7 @@ WasmValue print_i32(std::vector<WasmValue>& args) {
 
 int main() {
     // 1. Setup Object Store
-    ObjectStore store;
+    MemoryStore store;
 
     // 2. Load WAT Code
     // This WAT allocates a struct of 8 bytes (handle 'h'), writes 42 to offset 0,

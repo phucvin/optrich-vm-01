@@ -1,0 +1,4 @@
+Allocated handle: 1
+Read i32: 12345
+Read f64: 3.14159
+Caught expected OOB: Out of bounds object access

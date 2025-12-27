@@ -1,9 +1,9 @@
 #include <iostream>
 #include <cstring>
-#include "ObjectStore.hpp"
+#include "MemoryStore.h"
 
 int main() {
-    ObjectStore store;
+    MemoryStore store;
 
     // Test alloc
     int32_t h = store.alloc(16);
