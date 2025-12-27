@@ -62,7 +62,7 @@ int main() {
     vm.registerHostFunction("env", "read_f64", std::bind(h_read_f64, &store, _1), {"i32", "i32"}, {"f64"});
 
     try {
-        WasmValue res = vm.run("$test_array", {});
+        WasmValue res = vm.run("test_array", {});
         std::cout << "Result: " << res.f64 << std::endl;
         if (std::abs(res.f64 - 3.3) < 0.0001) return 0;
         else return 1;
