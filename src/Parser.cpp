@@ -44,18 +44,7 @@ void Parser::parseTopLevel(Module& mod) {
             mod.functions.push_back(parseFunc());
         } else if (fieldName.text == "import") {
             consume();
-            // (import "mod" "name" (func $name ...))
-            // Very basic skipper for now, or partial parser
-            // Actually, we need to handle imports to register host functions
-            // But for the prototype, maybe we can ignore explicit import declarations
-            // and just assume `call $name` works if registered?
-            // WAT usually requires imports to be declared.
-            // Let's skip and assume user writes correct WAT, but we need to track import indexes?
-            // For simplicity, I'll skip parsing the details but skip the block.
-            // The prompt says "input is in WAT format".
-            // I'll skip imports for now to focus on the "runtime" logic.
-            pos = checkpoint + 1; // +1 to skip (
-            skipSExpr();
+            mod.imports.push_back(parseImport());
         } else {
             pos = checkpoint + 1;
             skipSExpr();
@@ -243,4 +232,54 @@ void Parser::skipSExpr() {
         if (t.type == TokenType::LPAREN) depth++;
         if (t.type == TokenType::RPAREN) depth--;
     }
+}
+Import Parser::parseImport() {
+    Import imp;
+    // We already consumed 'import'
+    // Format: "mod" "field" (func $alias ...
+    Token modToken = consume();
+    if (modToken.type != TokenType::STRING) throw std::runtime_error("Expected module name string");
+    imp.module = modToken.text;
+
+    Token fieldToken = consume();
+    if (fieldToken.type != TokenType::STRING) throw std::runtime_error("Expected field name string");
+    imp.field = fieldToken.text;
+
+    expect(TokenType::LPAREN);
+    Token kind = consume();
+    if (kind.text != "func") {
+        throw std::runtime_error("Only func imports are supported");
+    }
+
+    // Optional identifier
+    if (peek().type == TokenType::IDENTIFIER) {
+        imp.alias = consume().text;
+    }
+
+    // Params and Results
+    while (peek().type != TokenType::RPAREN) {
+        expect(TokenType::LPAREN);
+        Token inner = consume();
+        if (inner.text == "param") {
+            while (peek().type != TokenType::RPAREN) {
+                 if (peek().type == TokenType::IDENTIFIER) {
+                     consume(); // skip param name
+                 }
+                 if (peek().type == TokenType::KEYWORD) {
+                     imp.paramTypes.push_back(consume().text);
+                 }
+            }
+            expect(TokenType::RPAREN);
+        } else if (inner.text == "result") {
+            while (peek().type != TokenType::RPAREN) {
+                imp.resultTypes.push_back(consume().text);
+            }
+            expect(TokenType::RPAREN);
+        } else {
+             throw std::runtime_error("Unexpected token in import func type");
+        }
+    }
+    expect(TokenType::RPAREN); // close (func ...
+    expect(TokenType::RPAREN); // close (import ...
+    return imp;
 }

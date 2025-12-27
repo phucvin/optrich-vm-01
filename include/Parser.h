@@ -22,6 +22,7 @@ private:
     Token expect(TokenType type);
 
     void parseTopLevel(Module& mod);
+    Import parseImport();
     Function parseFunc();
     void parseInstruction(std::vector<Instruction>& out);
 

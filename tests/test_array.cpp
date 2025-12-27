@@ -23,6 +23,10 @@ int main() {
     // index 0 at offset 0, index 1 at offset 8
     std::string code = R"(
         (module
+            (import "env" "alloc" (func $env.alloc (param i32) (result i32)))
+            (import "env" "write_f64" (func $env.write_f64 (param i32 i32 f64)))
+            (import "env" "read_f64" (func $env.read_f64 (param i32 i32) (result f64)))
+
             (func $test_array (result f64)
                 (local $arr i32)
                 (local.set $arr (call $env.alloc (i32.const 16)))
@@ -53,9 +57,9 @@ int main() {
     Interpreter vm(mod, store);
 
     using namespace std::placeholders;
-    vm.registerHostFunction("$env.alloc", std::bind(h_alloc, &store, _1), 1);
-    vm.registerHostFunction("$env.write_f64", std::bind(h_write_f64, &store, _1), 3);
-    vm.registerHostFunction("$env.read_f64", std::bind(h_read_f64, &store, _1), 2);
+    vm.registerHostFunction("env", "alloc", std::bind(h_alloc, &store, _1), {"i32"}, {"i32"});
+    vm.registerHostFunction("env", "write_f64", std::bind(h_write_f64, &store, _1), {"i32", "i32", "f64"}, {});
+    vm.registerHostFunction("env", "read_f64", std::bind(h_read_f64, &store, _1), {"i32", "i32"}, {"f64"});
 
     try {
         WasmValue res = vm.run("$test_array", {});

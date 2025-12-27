@@ -39,6 +39,10 @@ int main() {
     // reads it back, and returns it.
     std::string code = R"(
         (module
+            (import "env" "alloc" (func $env.alloc (param i32) (result i32)))
+            (import "env" "write_i32" (func $env.write_i32 (param i32 i32 i32)))
+            (import "env" "read_i32" (func $env.read_i32 (param i32 i32) (result i32)))
+
             (func $main (result i32)
                 (local $h i32)
                 ;; h = alloc(8)
@@ -64,10 +68,9 @@ int main() {
 
     // 5. Register Host Functions
     using namespace std::placeholders;
-    // Note: The parser preserves '$' in identifiers, so we register with it.
-    vm.registerHostFunction("$env.alloc", std::bind(host_alloc, &store, _1), 1);
-    vm.registerHostFunction("$env.write_i32", std::bind(host_write_i32, &store, _1), 3);
-    vm.registerHostFunction("$env.read_i32", std::bind(host_read_i32, &store, _1), 2);
+    vm.registerHostFunction("env", "alloc", std::bind(host_alloc, &store, _1), {"i32"}, {"i32"});
+    vm.registerHostFunction("env", "write_i32", std::bind(host_write_i32, &store, _1), {"i32", "i32", "i32"}, {});
+    vm.registerHostFunction("env", "read_i32", std::bind(host_read_i32, &store, _1), {"i32", "i32"}, {"i32"});
 
     // 6. Run
     try {
