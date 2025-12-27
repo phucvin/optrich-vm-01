@@ -57,7 +57,9 @@ Function Parser::parseFunc() {
     Function func;
 
     if (peek().type == TokenType::IDENTIFIER) {
-        func.name = consume().text;
+        std::string raw = consume().text;
+        if (!raw.empty() && raw[0] == '$') raw = raw.substr(1);
+        func.name = raw;
     }
 
     while (peek().type != TokenType::RPAREN) {
@@ -70,7 +72,10 @@ Function Parser::parseFunc() {
                 // (param $x i32) or (param i32)
                 while (peek().type != TokenType::RPAREN) {
                     std::string name = "";
-                    if (peek().type == TokenType::IDENTIFIER) name = consume().text;
+                    if (peek().type == TokenType::IDENTIFIER) {
+                        name = consume().text;
+                        if (!name.empty() && name[0] == '$') name = name.substr(1);
+                    }
                     if (peek().type == TokenType::KEYWORD) {
                         func.paramTypes.push_back(consume().text);
                         func.paramNames.push_back(name);
@@ -87,10 +92,13 @@ Function Parser::parseFunc() {
                 consume();
                 while (peek().type != TokenType::RPAREN) {
                         std::string name = "";
-                        if (peek().type == TokenType::IDENTIFIER) name = consume().text;
+                        if (peek().type == TokenType::IDENTIFIER) {
+                            name = consume().text;
+                            if (!name.empty() && name[0] == '$') name = name.substr(1);
+                        }
                         if (peek().type == TokenType::KEYWORD) {
-                        func.localTypes.push_back(consume().text);
-                        func.localNames.push_back(name);
+                            func.localTypes.push_back(consume().text);
+                            func.localNames.push_back(name);
                         }
                 }
                 expect(TokenType::RPAREN);
@@ -181,7 +189,9 @@ Instruction Parser::parseImmediate(Opcode op) {
 
     // Identifiers or indices
     if (t.type == TokenType::IDENTIFIER || t.type == TokenType::INTEGER) {
-        return Instruction(op, t.text); // Store as string, resolve later
+        std::string val = t.text;
+        if (!val.empty() && val[0] == '$') val = val.substr(1);
+        return Instruction(op, val); // Store as string, resolve later
     }
 
     throw std::runtime_error("Invalid immediate for opcode");
@@ -253,7 +263,9 @@ Import Parser::parseImport() {
 
     // Optional identifier
     if (peek().type == TokenType::IDENTIFIER) {
-        imp.alias = consume().text;
+        std::string val = consume().text;
+        if (!val.empty() && val[0] == '$') val = val.substr(1);
+        imp.alias = val;
     }
 
     // Params and Results

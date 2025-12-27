@@ -74,7 +74,7 @@ int main() {
 
     // 6. Run
     try {
-        WasmValue res = vm.run("$main", {});
+        WasmValue res = vm.run("main", {});
         std::cout << "Result: " << res.i32 << std::endl;
     } catch (const std::exception& e) {
         std::cerr << "Runtime Error: " << e.what() << std::endl;

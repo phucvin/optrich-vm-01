@@ -189,24 +189,24 @@ int main() {
 
         // Point3D functions
         vm_main.registerHostFunction("lib", "point3d_new",
-            [&](std::vector<WasmValue>& args) { return vm_lib.run("$point3d_new", args); }, {"i32", "i32", "i32"}, {"i32"});
+            [&](std::vector<WasmValue>& args) { return vm_lib.run("point3d_new", args); }, {"i32", "i32", "i32"}, {"i32"});
         vm_main.registerHostFunction("lib", "point3d_add",
-            [&](std::vector<WasmValue>& args) { return vm_lib.run("$point3d_add", args); }, {"i32", "i32"}, {});
+            [&](std::vector<WasmValue>& args) { return vm_lib.run("point3d_add", args); }, {"i32", "i32"}, {});
         vm_main.registerHostFunction("lib", "point3d_get_z",
-            [&](std::vector<WasmValue>& args) { return vm_lib.run("$point3d_get_z", args); }, {"i32"}, {"i32"});
+            [&](std::vector<WasmValue>& args) { return vm_lib.run("point3d_get_z", args); }, {"i32"}, {"i32"});
         vm_main.registerHostFunction("lib", "point3d_as_point2d",
-            [&](std::vector<WasmValue>& args) { return vm_lib.run("$point3d_as_point2d", args); }, {"i32"}, {"i32"});
+            [&](std::vector<WasmValue>& args) { return vm_lib.run("point3d_as_point2d", args); }, {"i32"}, {"i32"});
 
         // Helper accessors for point2d (x, y) which we invoke on the span
         vm_main.registerHostFunction("lib", "point2d_get_x",
-            [&](std::vector<WasmValue>& args) { return vm_lib.run("$point2d_get_x", args); }, {"i32"}, {"i32"});
+            [&](std::vector<WasmValue>& args) { return vm_lib.run("point2d_get_x", args); }, {"i32"}, {"i32"});
         vm_main.registerHostFunction("lib", "point2d_get_y",
-            [&](std::vector<WasmValue>& args) { return vm_lib.run("$point2d_get_y", args); }, {"i32"}, {"i32"});
+            [&](std::vector<WasmValue>& args) { return vm_lib.run("point2d_get_y", args); }, {"i32"}, {"i32"});
 
 
         // 8. Execute Main
         std::cout << "Running Multi-Module Test..." << std::endl;
-        WasmValue res = vm_main.run("$run", {});
+        WasmValue res = vm_main.run("run", {});
 
         std::cout << "Result: " << res.i32 << std::endl;
 
