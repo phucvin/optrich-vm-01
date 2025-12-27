@@ -45,14 +45,24 @@ make
 
 The build produces several test executables:
 
-*   `./test_lexer`
-*   `./test_parser`
-*   `./test_store`
-*   `./test_integration`
-*   `./test_array`
-*   `./test_multi_module`
+*   `./test_lexer`: Verifies the lexical analyzer.
+*   `./test_parser`: Checks the parser's ability to build ASTs.
+*   `./test_store`: Tests the memory store functionality.
+*   `./test_integration`: Runs end-to-end integration tests.
+*   `./test_array`: Tests array operations.
+*   `./test_multi_module`: Verifies interaction between multiple modules (including Point2D/Point3D reuse).
 
-Run them to verify functionality.
+You can run all tests using the provided script:
+
+```bash
+./run_tests.sh
+```
+
+Or run individual tests manually:
+
+```bash
+./test_multi_module
+```
 
 ## Example
 

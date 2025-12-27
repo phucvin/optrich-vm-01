@@ -1,5 +1,5 @@
 #include <iostream>
-#include "Lexer.hpp"
+#include "Lexer.h"
 
 void printToken(const Token& t) {
     switch(t.type) {

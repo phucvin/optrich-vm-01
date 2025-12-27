@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Lexer.hpp"
-#include "AST.hpp"
+#include "Lexer.h"
+#include "AST.h"
 #include <map>
 #include <stdexcept>
 #include <unordered_map>

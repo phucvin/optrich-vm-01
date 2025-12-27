@@ -1,6 +1,6 @@
 #pragma once
 
-#include "AST.hpp"
+#include "AST.h"
 #include "MemoryStore.h"
 #include <vector>
 #include <stack>
