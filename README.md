@@ -49,6 +49,17 @@ You can run all tests using the provided script:
 ./run_tests.sh
 ```
 
+### Run Test Data
+
+The project includes a data-driven test runner for `.wat` files located in the `testdata/` directory.
+
+```bash
+make run_testdata
+./run_testdata [directory]
+```
+
+This tool scans for `main_*.wat` files (e.g., `main_string.wat`), loads any dependencies (e.g., `lib_string.wat`), executes the `main` function, and compares the standard output to `main_*.expected_stdout`. If no directory is provided, it defaults to `testdata`.
+
 ## Example
 
 ```cpp

@@ -45,3 +45,4 @@ test_*
 !test_*.cpp
 !test_*.h
 !tests/test_*
+run_testdata
