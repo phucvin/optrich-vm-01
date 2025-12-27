@@ -51,6 +51,14 @@ struct Instruction {
     Instruction(Opcode op, std::string val);
 };
 
+struct Import {
+    std::string module;
+    std::string field;
+    std::string alias;
+    std::vector<std::string> paramTypes;
+    std::vector<std::string> resultTypes;
+};
+
 struct Function {
     std::string name;
     std::vector<std::string> paramTypes;
@@ -63,5 +71,6 @@ struct Function {
 };
 
 struct Module {
+    std::vector<Import> imports;
     std::vector<Function> functions;
 };

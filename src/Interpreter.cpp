@@ -8,7 +8,49 @@ Interpreter::Interpreter(Module& mod, MemoryStore& store) : module(mod), store(s
 }
 
 void Interpreter::registerHostFunction(std::string name, HostFunction func, int arity) {
-    hostFuncs[name] = {func, arity};
+    hostFuncs[name] = {func, arity, {}, {}};
+}
+
+void Interpreter::registerHostFunction(std::string modName, std::string fieldName, HostFunction func,
+                                       const std::vector<std::string>& params,
+                                       const std::vector<std::string>& results) {
+    // Scan module imports to see if this host function is needed
+    // In a real generic runtime, we might store this in a registry and link on instantiation.
+    // But here we are given the module at construction, so we can link immediately.
+
+    int importIndex = 0;
+    for (const auto& imp : module.imports) {
+        if (imp.module == modName && imp.field == fieldName) {
+            // Verify signature
+            if (imp.paramTypes != params) {
+                throw std::runtime_error("Import signature mismatch (params) for " + modName + "." + fieldName);
+            }
+            if (imp.resultTypes != results) {
+                throw std::runtime_error("Import signature mismatch (results) for " + modName + "." + fieldName);
+            }
+
+            HostFuncEntry entry;
+            entry.func = func;
+            entry.arity = (int)params.size();
+            entry.paramTypes = params;
+            entry.resultTypes = results;
+
+            // Link by alias if present
+            if (!imp.alias.empty()) {
+                hostFuncs[imp.alias] = entry;
+            }
+            // Link by index (stringify import index)
+            // Note: In standard WASM, function index space starts with imports.
+            // If we want to support `call 0`, we need to map "0" -> this host func.
+            hostFuncs[std::to_string(importIndex)] = entry;
+        }
+        importIndex++;
+    }
+
+    // If not found in imports, we might still want to register it if the user manually constructed
+    // the module or expects to use it otherwise?
+    // But without an alias in the module, the code can't call it easily unless we just store it somewhere.
+    // For this task, we focus on satisfying the declared imports.
 }
 
 WasmValue Interpreter::run(std::string funcName, std::vector<WasmValue> args) {

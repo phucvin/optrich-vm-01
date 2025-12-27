@@ -39,13 +39,21 @@ using HostFunction = std::function<WasmValue(std::vector<WasmValue>& args)>;
 struct HostFuncEntry {
     HostFunction func;
     int arity;
+    std::vector<std::string> paramTypes;
+    std::vector<std::string> resultTypes;
 };
 
 class Interpreter {
 public:
     Interpreter(Module& mod, MemoryStore& store);
 
+    // Old API (deprecated or simple wrapper)
     void registerHostFunction(std::string name, HostFunction func, int arity);
+
+    // New API for full module imports
+    void registerHostFunction(std::string modName, std::string fieldName, HostFunction func,
+                              const std::vector<std::string>& params,
+                              const std::vector<std::string>& results);
 
     WasmValue run(std::string funcName, std::vector<WasmValue> args);
 
