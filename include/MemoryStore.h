@@ -14,9 +14,16 @@ public:
     // If we want to detect null, we can start from 1. Let's start from 1.
     using Handle = int32_t;
 
+    struct MemoryBlock {
+        std::vector<uint8_t> storage; // Empty if it's a span/view
+        uint8_t* ptr;
+        size_t size;
+    };
+
     MemoryStore();
 
     Handle alloc(int32_t size);
+    Handle make_span(Handle handle, int32_t offset, int32_t size);
 
     // Generic read/write helper
     template <typename T>
@@ -25,7 +32,7 @@ public:
         // Handle endianness? Assuming host is same as Wasm (Little Endian) for prototype.
         // x86/ARM are LE.
         T value;
-        const uint8_t* src = objects[handle].data() + offset;
+        const uint8_t* src = objects[handle].ptr + offset;
         std::memcpy(&value, src, sizeof(T));
         return value;
     }
@@ -33,12 +40,12 @@ public:
     template <typename T>
     void write(Handle handle, int32_t offset, T value) {
         validate_access(handle, offset, sizeof(T));
-        uint8_t* dst = objects[handle].data() + offset;
+        uint8_t* dst = objects[handle].ptr + offset;
         std::memcpy(dst, &value, sizeof(T));
     }
 
 private:
-    std::vector<std::vector<uint8_t>> objects;
+    std::vector<MemoryBlock> objects;
 
     void validate_access(Handle handle, int32_t offset, size_t size);
 };

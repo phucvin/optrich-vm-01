@@ -1,7 +1,7 @@
 CXX = g++
 CXXFLAGS = -std=c++17 -Iinclude -Wall -Wextra
 
-TARGETS = test_lexer test_parser test_store test_integration test_array test_multi_module
+TARGETS = test_lexer test_parser test_store test_integration test_array test_multi_module test_memory_span
 
 SRCS = src/MemoryStore.cpp src/Interpreter.cpp src/Parser.cpp src/Lexer.cpp src/AST.cpp
 OBJS = $(SRCS:.cpp=.o)
@@ -28,6 +28,9 @@ test_integration: tests/test_integration.cpp $(OBJS)
 
 test_array: tests/test_array.cpp $(OBJS)
 	$(CXX) $(CXXFLAGS) tests/test_array.cpp $(OBJS) -o test_array
+
+test_memory_span: tests/test_memory_span.cpp src/MemoryStore.o
+	$(CXX) $(CXXFLAGS) tests/test_memory_span.cpp src/MemoryStore.o -o test_memory_span
 
 clean:
 	rm -f $(TARGETS) src/*.o

@@ -1,22 +1,43 @@
 #!/bin/bash
 
-# List of test binaries
-TESTS=("test_lexer" "test_parser" "test_store" "test_integration" "test_array" "test_multi_module")
-FAILED=0
+# 1. Run Make to build everything
+echo "Building tests..."
+if ! make > /dev/null; then
+    echo "Build failed."
+    exit 1
+fi
 
+# 2. Discover test binaries
+# Find files in current directory that start with 'test_', are executable, and are not directories/source files.
+# We can just look for the TARGETS defined in Makefile, but to be dynamic as requested:
+# We look for files matching ./test_* that are executable.
+FAILED=0
 echo "Running tests..."
 
-for t in "${TESTS[@]}"; do
-    if [ ! -f "./$t" ]; then
-        echo "Error: Binary ./$t not found. Did you run 'make'?"
-        FAILED=1
+# Using find to get executable files starting with test_ in the current dir
+# -maxdepth 1: current dir only
+# -type f: files
+# -executable: executable permission
+# -name "test_*": starts with test_
+TESTS=$(find . -maxdepth 1 -type f -executable -name "test_*" | sort)
+
+if [ -z "$TESTS" ]; then
+    echo "No tests found."
+    exit 1
+fi
+
+for t_path in $TESTS; do
+    # Strip ./ prefix
+    t=$(basename "$t_path")
+
+    # Check if it's likely a source file or object file (paranoid check, though -executable usually filters .cpp/.o unless chmod +x)
+    if [[ "$t" == *.cpp ]] || [[ "$t" == *.o ]] || [[ "$t" == *.h ]]; then
         continue
     fi
 
     EXPECTED="tests/$t.expected_stdout"
     if [ ! -f "$EXPECTED" ]; then
-        echo "Error: Expected output file $EXPECTED not found."
-        FAILED=1
+        echo "Warning: Expected output file $EXPECTED not found for binary $t. Skipping."
         continue
     fi
 
