@@ -2,25 +2,38 @@
   (import "env" "alloc" (func $alloc (param i32) (result i32)))
   (import "env" "write_u8" (func $write_u8 (param i32 i32 i32)))
   (import "env" "read_u8" (func $read_u8 (param i32 i32) (result i32)))
+  (import "env" "write_i32" (func $write_i32 (param i32 i32 i32)))
+  (import "env" "read_i32" (func $read_i32 (param i32 i32) (result i32)))
   (import "env" "putchar" (func $putchar (param i32)))
 
   (func $create (param $size i32) (result i32)
-    (call $alloc (local.get $size))
+    (local $h i32)
+    (local.set $h (call $alloc (i32.add (local.get $size) (i32.const 4))))
+    (call $write_i32 (local.get $h) (i32.const 0) (local.get $size))
+    (local.get $h)
+  )
+
+  (func $length (param $handle i32) (result i32)
+    (call $read_i32 (local.get $handle) (i32.const 0))
   )
 
   (func $set (param $handle i32) (param $index i32) (param $val i32)
-    (call $write_u8 (local.get $handle) (local.get $index) (local.get $val))
+    (call $write_u8 (local.get $handle) (i32.add (local.get $index) (i32.const 4)) (local.get $val))
   )
 
   (func $get (param $handle i32) (param $index i32) (result i32)
-    (call $read_u8 (local.get $handle) (local.get $index))
+    (call $read_u8 (local.get $handle) (i32.add (local.get $index) (i32.const 4)))
   )
 
-  (func $concat (param $h1 i32) (param $len1 i32) (param $h2 i32) (param $len2 i32) (result i32)
+  (func $concat (param $h1 i32) (param $h2 i32) (result i32)
+    (local $len1 i32)
+    (local $len2 i32)
     (local $h3 i32)
     (local $i i32)
-    ;; h3 = alloc(len1 + len2)
-    (local.set $h3 (call $alloc (i32.add (local.get $len1) (local.get $len2))))
+
+    (local.set $len1 (call $length (local.get $h1)))
+    (local.set $len2 (call $length (local.get $h2)))
+    (local.set $h3 (call $create (i32.add (local.get $len1) (local.get $len2))))
 
     ;; Copy string 1
     (local.set $i (i32.const 0))
@@ -31,15 +44,8 @@
         i32.ge_s
         br_if $break1
 
-        ;; write_u8(h3, i, read_u8(h1, i))
-        local.get $h3
-        local.get $i
-        local.get $h1
-        local.get $i
-        call $read_u8
-        call $write_u8
+        (call $set (local.get $h3) (local.get $i) (call $get (local.get $h1) (local.get $i)))
 
-        ;; i++
         local.get $i
         i32.const 1
         i32.add
@@ -58,17 +64,8 @@
         i32.ge_s
         br_if $break2
 
-        ;; write_u8(h3, len1 + i, read_u8(h2, i))
-        local.get $h3
-        local.get $len1
-        local.get $i
-        i32.add
-        local.get $h2
-        local.get $i
-        call $read_u8
-        call $write_u8
+        (call $set (local.get $h3) (i32.add (local.get $len1) (local.get $i)) (call $get (local.get $h2) (local.get $i)))
 
-        ;; i++
         local.get $i
         i32.const 1
         i32.add
@@ -81,9 +78,13 @@
     (local.get $h3)
   )
 
-  (func $print (param $handle i32) (param $len i32)
+  (func $print (param $handle i32)
+    (local $len i32)
     (local $i i32)
+
+    (local.set $len (call $length (local.get $handle)))
     (local.set $i (i32.const 0))
+
     block $break
       loop $loop
         local.get $i
@@ -91,9 +92,7 @@
         i32.ge_s
         br_if $break
 
-        local.get $handle
-        local.get $i
-        call $read_u8
+        (call $get (local.get $handle) (local.get $i))
         call $putchar
 
         local.get $i
