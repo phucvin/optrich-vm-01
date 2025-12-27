@@ -1,17 +1,17 @@
 #include <iostream>
 #include <functional>
-#include "Parser.hpp"
-#include "Interpreter.hpp"
-#include "ObjectStore.hpp"
+#include "Parser.h"
+#include "Interpreter.h"
+#include "MemoryStore.h"
 
 // Host Functions (copied from test_integration.cpp for self-containment)
-WasmValue host_alloc(ObjectStore* store, std::vector<WasmValue>& args) {
+WasmValue host_alloc(MemoryStore* store, std::vector<WasmValue>& args) {
     int32_t size = args[0].i32;
     int32_t handle = store->alloc(size);
     return WasmValue(handle);
 }
 
-WasmValue host_write_i32(ObjectStore* store, std::vector<WasmValue>& args) {
+WasmValue host_write_i32(MemoryStore* store, std::vector<WasmValue>& args) {
     int32_t handle = args[0].i32;
     int32_t offset = args[1].i32;
     int32_t val = args[2].i32;
@@ -19,7 +19,7 @@ WasmValue host_write_i32(ObjectStore* store, std::vector<WasmValue>& args) {
     return WasmValue();
 }
 
-WasmValue host_read_i32(ObjectStore* store, std::vector<WasmValue>& args) {
+WasmValue host_read_i32(MemoryStore* store, std::vector<WasmValue>& args) {
     int32_t handle = args[0].i32;
     int32_t offset = args[1].i32;
     int32_t val = store->read<int32_t>(handle, offset);
@@ -37,7 +37,7 @@ WasmValue bridge_call(Interpreter* targetVM, std::string funcName, std::vector<W
 int main() {
     try {
         // 1. Setup Shared Object Store
-        ObjectStore store;
+        MemoryStore store;
 
         // 2. Define Library Module Code
         // Provides Point2D logic: new_point, get_x, get_y, add_points
