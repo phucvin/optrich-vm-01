@@ -37,39 +37,31 @@ enum class Opcode {
 
     // F64
     F64_ADD, F64_SUB, F64_MUL, F64_DIV,
-
-    // ... can add others as needed
 };
 
-// Simplified IR Instruction
 struct Instruction {
     Opcode opcode;
-    // Operands
     std::variant<int32_t, int64_t, float, double, std::string> operand;
-    // For block/loop/if, we might need a block type or jump target
-    // For call, function index
-    // For br, label index
 
-    Instruction(Opcode op) : opcode(op), operand(0) {}
-    Instruction(Opcode op, int32_t val) : opcode(op), operand(val) {}
-    Instruction(Opcode op, int64_t val) : opcode(op), operand(val) {}
-    Instruction(Opcode op, float val) : opcode(op), operand(val) {}
-    Instruction(Opcode op, double val) : opcode(op), operand(val) {}
-    Instruction(Opcode op, std::string val) : opcode(op), operand(val) {} // For symbolic resolution later
+    Instruction(Opcode op);
+    Instruction(Opcode op, int32_t val);
+    Instruction(Opcode op, int64_t val);
+    Instruction(Opcode op, float val);
+    Instruction(Opcode op, double val);
+    Instruction(Opcode op, std::string val);
 };
 
 struct Function {
-    std::string name; // Symbol
-    std::vector<std::string> paramTypes; // "i32", "f64"
-    std::vector<std::string> paramNames; // "$x", "" (empty if unnamed)
+    std::string name;
+    std::vector<std::string> paramTypes;
+    std::vector<std::string> paramNames;
     std::vector<std::string> resultTypes;
     std::vector<std::string> localTypes;
-    std::vector<std::string> localNames; // "$y"
+    std::vector<std::string> localNames;
 
     std::vector<Instruction> body;
 };
 
 struct Module {
     std::vector<Function> functions;
-    // exports, imports, globals, etc.
 };
