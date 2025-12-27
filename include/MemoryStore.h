@@ -8,25 +8,6 @@
 #include <cstring> // for memcpy
 #include <algorithm> // for std::fill
 
-// Basic Wasm Values
-// Note: In a real engine we might use a union or std::variant.
-// For simplicity and standard compliance, we'll use a tagged union approach.
-struct WasmValue {
-    enum Type { I32, I64, F32, F64, VOID } type;
-    union {
-        int32_t i32;
-        int64_t i64;
-        float f32;
-        double f64;
-    };
-
-    WasmValue() : type(VOID), i64(0) {}
-    explicit WasmValue(int32_t v) : type(I32), i32(v) {}
-    explicit WasmValue(int64_t v) : type(I64), i64(v) {}
-    explicit WasmValue(float v) : type(F32), f32(v) {}
-    explicit WasmValue(double v) : type(F64), f64(v) {}
-};
-
 class MemoryStore {
 public:
     // Handle 0 is usually null/invalid, but let's just use 0-based index.

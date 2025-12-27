@@ -61,12 +61,12 @@ int main() {
                     (call $env.read_i32 (local.get $p) (i32.const 4))
                 )
 
-                (func $point2d_add (param $p1 i32) (param $p2 i32) (result i32)
+                (func $point2d_add (param $p1 i32) (param $p2 i32)
                     (local $x i32)
                     (local $y i32)
                     (local.set $x (i32.add (call $point2d_get_x (local.get $p1)) (call $point2d_get_x (local.get $p2))))
                     (local.set $y (i32.add (call $point2d_get_y (local.get $p1)) (call $point2d_get_y (local.get $p2))))
-                    (call $point2d_new (local.get $x) (local.get $y))
+                    (call $point2d_init (local.get $p1) (local.get $x) (local.get $y))
                 )
 
                 (func $point3d_new (param $x i32) (param $y i32) (param $z i32) (result i32)
@@ -82,15 +82,14 @@ int main() {
                     (call $env.read_i32 (local.get $p) (i32.const 8))
                 )
 
-                (func $point3d_add (param $p1 i32) (param $p2 i32) (result i32)
-                    (local $x i32)
-                    (local $y i32)
+                (func $point3d_add (param $p1 i32) (param $p2 i32)
                     (local $z i32)
-                    ;; Reuse point2d getters for x and y
-                    (local.set $x (i32.add (call $point2d_get_x (local.get $p1)) (call $point2d_get_x (local.get $p2))))
-                    (local.set $y (i32.add (call $point2d_get_y (local.get $p1)) (call $point2d_get_y (local.get $p2))))
+                    ;; Reuse point2d_add for x and y updates on p1
+                    (call $point2d_add (local.get $p1) (local.get $p2))
+
+                    ;; Update z
                     (local.set $z (i32.add (call $point3d_get_z (local.get $p1)) (call $point3d_get_z (local.get $p2))))
-                    (call $point3d_new (local.get $x) (local.get $y) (local.get $z))
+                    (call $env.write_i32 (local.get $p1) (i32.const 8) (local.get $z))
                 )
             )
         )";
@@ -102,18 +101,17 @@ int main() {
                 (func $run (result i32)
                     (local $p1 i32)
                     (local $p2 i32)
-                    (local $p3 i32)
                     ;; p1 = point3d_new(10, 20, 30)
                     (local.set $p1 (call $lib.point3d_new (i32.const 10) (i32.const 20) (i32.const 30)))
                     ;; p2 = point3d_new(1, 2, 3)
                     (local.set $p2 (call $lib.point3d_new (i32.const 1) (i32.const 2) (i32.const 3)))
-                    ;; p3 = point3d_add(p1, p2)
-                    (local.set $p3 (call $lib.point3d_add (local.get $p1) (local.get $p2)))
+                    ;; point3d_add(p1, p2) -> p1 is modified
+                    (call $lib.point3d_add (local.get $p1) (local.get $p2))
 
-                    ;; result = p3.x + p3.y + p3.z
+                    ;; result = p1.x + p1.y + p1.z
                     (i32.add
-                        (i32.add (call $lib.point2d_get_x (local.get $p3)) (call $lib.point2d_get_y (local.get $p3)))
-                        (call $lib.point3d_get_z (local.get $p3))
+                        (i32.add (call $lib.point2d_get_x (local.get $p1)) (call $lib.point2d_get_y (local.get $p1)))
+                        (call $lib.point3d_get_z (local.get $p1))
                     )
                 )
             )
@@ -165,7 +163,7 @@ int main() {
         // Verify
         // p1 = (10, 20, 30)
         // p2 = (1, 2, 3)
-        // p3 = (11, 22, 33)
+        // p1 after add = (11, 22, 33)
         // sum = 11 + 22 + 33 = 66
         if (res.i32 == 66) {
             std::cout << "SUCCESS" << std::endl;
