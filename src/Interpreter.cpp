@@ -7,10 +7,6 @@ Interpreter::Interpreter(Module& mod, MemoryStore& store) : module(mod), store(s
     }
 }
 
-void Interpreter::registerHostFunction(std::string name, HostFunction func, int arity) {
-    hostFuncs[name] = {func, arity, {}, {}};
-}
-
 void Interpreter::registerHostFunction(std::string modName, std::string fieldName, HostFunction func,
                                        const std::vector<std::string>& params,
                                        const std::vector<std::string>& results) {
