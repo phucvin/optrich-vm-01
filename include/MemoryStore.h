@@ -18,11 +18,13 @@ public:
         std::vector<uint8_t> storage; // Empty if it's a span/view
         uint8_t* ptr;
         size_t size;
+        bool readOnly = false;
     };
 
     MemoryStore();
 
     Handle alloc(int32_t size);
+    Handle alloc_readonly(const std::vector<uint8_t>& data);
     Handle make_span(Handle handle, int32_t offset, int32_t size);
 
     // Generic read/write helper
@@ -39,7 +41,7 @@ public:
 
     template <typename T>
     void write(Handle handle, int32_t offset, T value) {
-        validate_access(handle, offset, sizeof(T));
+        validate_access(handle, offset, sizeof(T), true);
         uint8_t* dst = objects[handle].ptr + offset;
         std::memcpy(dst, &value, sizeof(T));
     }
@@ -47,5 +49,5 @@ public:
 private:
     std::vector<MemoryBlock> objects;
 
-    void validate_access(Handle handle, int32_t offset, size_t size);
+    void validate_access(Handle handle, int32_t offset, size_t size, bool forWrite = false);
 };
