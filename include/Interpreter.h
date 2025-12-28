@@ -61,6 +61,7 @@ private:
     std::vector<WasmValue> valueStack;
     std::unordered_map<std::string, size_t> funcMap;
     std::unordered_map<std::string, HostFuncEntry> hostFuncs;
+    std::unordered_map<std::string, int32_t> stringHandles;
 
     void push(WasmValue v);
     WasmValue pop();

@@ -5,6 +5,27 @@ Interpreter::Interpreter(Module& mod, MemoryStore& store) : module(mod), store(s
     for (size_t i = 0; i < module.functions.size(); ++i) {
         funcMap[module.functions[i].name] = i;
     }
+
+    // Initialize Strings
+    for (const auto& strDef : module.strings) {
+        std::vector<uint8_t> data;
+        int32_t len = strDef.value.length();
+
+        // 4 bytes length
+        data.push_back(len & 0xFF);
+        data.push_back((len >> 8) & 0xFF);
+        data.push_back((len >> 16) & 0xFF);
+        data.push_back((len >> 24) & 0xFF);
+
+        // String bytes
+        for (char c : strDef.value) {
+            data.push_back((uint8_t)c);
+        }
+
+        // Allocate readonly
+        int32_t handle = store.alloc_readonly(data);
+        stringHandles[strDef.name] = handle;
+    }
 }
 
 void Interpreter::registerHostFunction(std::string modName, std::string fieldName, HostFunction func,
@@ -125,6 +146,14 @@ void Interpreter::execute(Instruction& instr, StackFrame& frame) {
         case Opcode::F64_CONST:
             push(WasmValue(std::get<double>(instr.operand)));
             break;
+        case Opcode::STRING_CONST: {
+            std::string alias = std::get<std::string>(instr.operand);
+            if (stringHandles.find(alias) == stringHandles.end()) {
+                throw std::runtime_error("Unknown string constant: " + alias);
+            }
+            push(WasmValue(stringHandles[alias]));
+            break;
+        }
         case Opcode::I32_ADD: {
             int32_t b = pop().i32;
             int32_t a = pop().i32;

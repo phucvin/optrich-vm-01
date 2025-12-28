@@ -44,6 +44,23 @@ void Parser::parseTopLevel(Module& mod) {
         } else if (fieldName.text == "import") {
             consume();
             mod.imports.push_back(parseImport());
+        } else if (fieldName.text == "string") {
+            consume();
+            StringDefinition strDef;
+            if (peek().type == TokenType::IDENTIFIER) {
+                std::string raw = consume().text;
+                if (!raw.empty() && raw[0] == '$') raw = raw.substr(1);
+                strDef.name = raw;
+            } else {
+                throw std::runtime_error("Expected identifier for string definition");
+            }
+            if (peek().type == TokenType::STRING) {
+                strDef.value = consume().text;
+            } else {
+                throw std::runtime_error("Expected string value for string definition");
+            }
+            mod.strings.push_back(strDef);
+            expect(TokenType::RPAREN);
         } else {
             pos = checkpoint + 1;
             skipSExpr();
@@ -174,6 +191,7 @@ bool Parser::takesImmediate(Opcode op) {
         case Opcode::CALL:
         case Opcode::BLOCK:
         case Opcode::LOOP:
+        case Opcode::STRING_CONST:
             return true;
         default:
             return false;
@@ -223,6 +241,7 @@ Opcode Parser::mapOpcode(const std::string& txt) {
         {"i32.gt_s", Opcode::I32_GT_S},
         {"i32.le_s", Opcode::I32_LE_S},
         {"i32.ge_s", Opcode::I32_GE_S},
+        {"string.const", Opcode::STRING_CONST},
     };
     if (map.count(txt)) return map.at(txt);
     if (txt.find("store") != std::string::npos || txt.find("load") != std::string::npos) {

@@ -29,6 +29,7 @@ enum class Opcode {
     I64_CONST,
     F32_CONST,
     F64_CONST,
+    STRING_CONST, // New Opcode for string constants
 
     // Numeric i32
     I32_EQZ, I32_EQ, I32_NE, I32_LT_S, I32_LT_U, I32_GT_S, I32_GT_U, I32_LE_S, I32_LE_U, I32_GE_S, I32_GE_U,
@@ -70,7 +71,13 @@ struct Function {
     std::vector<Instruction> body;
 };
 
+struct StringDefinition {
+    std::string name;
+    std::string value;
+};
+
 struct Module {
     std::vector<Import> imports;
     std::vector<Function> functions;
+    std::vector<StringDefinition> strings;
 };
