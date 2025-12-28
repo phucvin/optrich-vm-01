@@ -26,6 +26,25 @@ Interpreter::Interpreter(Module& mod, MemoryStore& store) : module(mod), store(s
         int32_t handle = store.alloc_readonly(data);
         stringHandles[strDef.name] = handle;
     }
+
+    // Initialize Table
+    if (!module.tables.empty()) {
+        const auto& tbl = module.tables[0];
+        table.resize(tbl.min);
+    }
+    for (const auto& elem : module.elements) {
+        // Evaluate offset (simplistic: assume i32.const)
+        int32_t offset = 0;
+        if (elem.offset.opcode == Opcode::I32_CONST) {
+             offset = std::get<int32_t>(elem.offset.operand);
+        }
+
+        for (size_t i = 0; i < elem.functionNames.size(); ++i) {
+             if (offset + i < table.size()) {
+                 table[offset + i] = elem.functionNames[i];
+             }
+        }
+    }
 }
 
 void Interpreter::registerHostFunction(std::string modName, std::string fieldName, HostFunction func,
@@ -243,6 +262,61 @@ void Interpreter::execute(Instruction& instr, StackFrame& frame) {
             }
             break;
         }
+        case Opcode::CALL_INDIRECT: {
+            // Operand is the TYPE name
+            std::string typeName = std::get<std::string>(instr.operand);
+            int32_t idx = pop().i32;
+
+            if (idx < 0 || idx >= (int32_t)table.size()) {
+                throw std::runtime_error("Undefined table index: " + std::to_string(idx));
+            }
+            std::string funcName = table[idx];
+            if (funcName.empty()) {
+                throw std::runtime_error("Uninitialized table element at index " + std::to_string(idx));
+            }
+
+            // Resolve Type
+            Type* expectedType = resolveType(typeName);
+            if (!expectedType) {
+                 throw std::runtime_error("Unknown type: " + typeName);
+            }
+
+            // Check if function exists
+            if (funcMap.count(funcName)) {
+                 size_t fIdx = funcMap[funcName];
+                 Function* callee = &module.functions[fIdx];
+
+                 // Check Signature
+                 if (callee->paramTypes != expectedType->paramTypes) {
+                     throw std::runtime_error("Indirect call signature mismatch (params)");
+                 }
+                 if (callee->resultTypes != expectedType->resultTypes) {
+                     throw std::runtime_error("Indirect call signature mismatch (results)");
+                 }
+
+                 // Perform Call
+                 StackFrame newFrame;
+                 newFrame.func = callee;
+                 newFrame.pc = 0;
+                 newFrame.returnHeight = valueStack.size() - callee->paramTypes.size();
+
+                 size_t nargs = callee->paramTypes.size();
+                 std::vector<WasmValue> args(nargs);
+                 for(int i = nargs-1; i>=0; --i) {
+                     args[i] = pop();
+                 }
+                 for(auto& a : args) newFrame.locals.push_back(a);
+
+                 for(const auto& lt : callee->localTypes) {
+                     (void)lt;
+                     newFrame.locals.push_back(WasmValue((int32_t)0));
+                 }
+                 callStack.push_back(newFrame);
+            } else {
+                 throw std::runtime_error("Unknown function in table: " + funcName);
+            }
+            break;
+        }
         case Opcode::I32_EQ: {
             int32_t b = pop().i32;
             int32_t a = pop().i32;
@@ -381,4 +455,11 @@ int Interpreter::resolveLocal(const std::string& id, Function* func) {
         if (func->localNames[i] == id) return func->paramNames.size() + i;
     }
     throw std::runtime_error("Unknown local: " + id);
+}
+
+Type* Interpreter::resolveType(const std::string& name) {
+    for (auto& t : module.types) {
+        if (t.name == name) return &t;
+    }
+    return nullptr;
 }

@@ -16,6 +16,7 @@ enum class Opcode {
     BR_IF,
     RETURN,
     CALL,
+    CALL_INDIRECT, // New Opcode
 
     // Variables
     LOCAL_GET,
@@ -29,7 +30,7 @@ enum class Opcode {
     I64_CONST,
     F32_CONST,
     F64_CONST,
-    STRING_CONST, // New Opcode for string constants
+    STRING_CONST,
 
     // Numeric i32
     I32_EQZ, I32_EQ, I32_NE, I32_LT_S, I32_LT_U, I32_GT_S, I32_GT_U, I32_LE_S, I32_LE_U, I32_GE_S, I32_GE_U,
@@ -44,6 +45,7 @@ struct Instruction {
     Opcode opcode;
     std::variant<int32_t, int64_t, float, double, std::string> operand;
 
+    Instruction() : opcode(Opcode::NOP), operand(0) {} // Default constructor
     Instruction(Opcode op);
     Instruction(Opcode op, int32_t val);
     Instruction(Opcode op, int64_t val);
@@ -76,8 +78,29 @@ struct StringDefinition {
     std::string value;
 };
 
+struct Type {
+    std::string name;
+    std::vector<std::string> paramTypes;
+    std::vector<std::string> resultTypes;
+};
+
+struct Table {
+    std::string name; // Usually empty or "0" for MVP, but can be named
+    uint32_t min;
+    uint32_t max;
+};
+
+struct ElementSegment {
+    uint32_t tableIndex;
+    Instruction offset; // Expression to calculate offset (usually i32.const)
+    std::vector<std::string> functionNames;
+};
+
 struct Module {
     std::vector<Import> imports;
     std::vector<Function> functions;
     std::vector<StringDefinition> strings;
+    std::vector<Type> types;
+    std::vector<Table> tables;
+    std::vector<ElementSegment> elements;
 };

@@ -63,6 +63,10 @@ private:
     std::unordered_map<std::string, HostFuncEntry> hostFuncs;
     std::unordered_map<std::string, int32_t> stringHandles;
 
+    // Table storage: a simple vector of function names
+    // Null/empty slots mean uninitialized.
+    std::vector<std::string> table;
+
     void push(WasmValue v);
     WasmValue pop();
 
@@ -71,4 +75,5 @@ private:
     void execute(Instruction& instr, StackFrame& frame);
 
     int resolveLocal(const std::string& id, Function* func);
+    Type* resolveType(const std::string& name);
 };

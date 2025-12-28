@@ -44,6 +44,15 @@ void Parser::parseTopLevel(Module& mod) {
         } else if (fieldName.text == "import") {
             consume();
             mod.imports.push_back(parseImport());
+        } else if (fieldName.text == "type") {
+            consume();
+            mod.types.push_back(parseType());
+        } else if (fieldName.text == "table") {
+            consume();
+            mod.tables.push_back(parseTable());
+        } else if (fieldName.text == "elem") {
+            consume();
+            mod.elements.push_back(parseElem());
         } else if (fieldName.text == "string") {
             consume();
             StringDefinition strDef;
@@ -132,6 +141,89 @@ Function Parser::parseFunc() {
     return func;
 }
 
+Type Parser::parseType() {
+    Type t;
+    if (peek().type == TokenType::IDENTIFIER) {
+        std::string raw = consume().text;
+        if (!raw.empty() && raw[0] == '$') raw = raw.substr(1);
+        t.name = raw;
+    }
+
+    expect(TokenType::LPAREN);
+    if (consume().text != "func") throw std::runtime_error("Expected func in type definition");
+
+    while (peek().type == TokenType::LPAREN) {
+        consume(); // (
+        Token inner = consume();
+        if (inner.text == "param") {
+             while (peek().type != TokenType::RPAREN) {
+                 if (peek().type == TokenType::IDENTIFIER) {
+                     consume(); // skip name
+                 }
+                 if (peek().type == TokenType::KEYWORD) {
+                     t.paramTypes.push_back(consume().text);
+                 }
+             }
+        } else if (inner.text == "result") {
+             while (peek().type != TokenType::RPAREN) {
+                 t.resultTypes.push_back(consume().text);
+             }
+        } else {
+             throw std::runtime_error("Unexpected token in type definition");
+        }
+        expect(TokenType::RPAREN);
+    }
+    expect(TokenType::RPAREN); // End func
+    expect(TokenType::RPAREN); // End type
+    return t;
+}
+
+Table Parser::parseTable() {
+    Table tbl;
+    // (table $name? min max? funcref)
+    if (peek().type == TokenType::IDENTIFIER) {
+        std::string raw = consume().text;
+        if (!raw.empty() && raw[0] == '$') raw = raw.substr(1);
+        tbl.name = raw;
+    }
+
+    Token t1 = consume();
+    if (t1.type != TokenType::INTEGER) throw std::runtime_error("Expected min size for table");
+    tbl.min = std::stoi(t1.text);
+
+    if (peek().type == TokenType::INTEGER) {
+        tbl.max = std::stoi(consume().text);
+    } else {
+        tbl.max = tbl.min;
+    }
+
+    if (consume().text != "funcref") throw std::runtime_error("Expected funcref");
+    expect(TokenType::RPAREN);
+    return tbl;
+}
+
+ElementSegment Parser::parseElem() {
+    ElementSegment elem;
+    elem.tableIndex = 0; // Default
+
+    // (elem (i32.const offset) $f1 ...)
+    expect(TokenType::LPAREN);
+    // The offset must be i32.const
+    if (consume().text != "i32.const") throw std::runtime_error("Expected i32.const in elem offset");
+    Token off = consume();
+    elem.offset = Instruction(Opcode::I32_CONST, (int32_t)std::stoi(off.text));
+    expect(TokenType::RPAREN);
+
+    while (peek().type != TokenType::RPAREN) {
+        Token funcName = consume();
+        std::string name = funcName.text;
+        if (!name.empty() && name[0] == '$') name = name.substr(1);
+        elem.functionNames.push_back(name);
+    }
+    expect(TokenType::RPAREN);
+    return elem;
+}
+
 void Parser::parseInstruction(std::vector<Instruction>& out) {
     if (peek().type == TokenType::LPAREN) {
         // Folded: (opcode arg1 arg2)
@@ -150,6 +242,33 @@ void Parser::parseInstruction(std::vector<Instruction>& out) {
              }
              expect(TokenType::RPAREN);
              out.push_back(Instruction(Opcode::END)); // END
+        }
+        else if (op == Opcode::CALL_INDIRECT) {
+            // (call_indirect (type $t) (arg1) ... (index))
+            // This is folded. In RPN: arg1 ... index call_indirect $t
+            // We need to parse immediate (type) which is usually (type $t)
+            Instruction instr(Opcode::CALL_INDIRECT, std::string(""));
+
+            // Parse type annotation
+            if (peek().type == TokenType::LPAREN) {
+                // Expect (type $t)
+                consume();
+                if (consume().text != "type") throw std::runtime_error("Expected type in call_indirect");
+                Token typeName = consume();
+                std::string val = typeName.text;
+                if (!val.empty() && val[0] == '$') val = val.substr(1);
+                instr.operand = val;
+                expect(TokenType::RPAREN);
+            } else {
+                 throw std::runtime_error("Expected type annotation for call_indirect");
+            }
+
+            // Parse args + index
+            while (peek().type != TokenType::RPAREN) {
+                parseInstruction(out);
+            }
+            expect(TokenType::RPAREN);
+            out.push_back(instr);
         }
         // Standard RPN for other instructions with immediates/operands
         else if (takesImmediate(op)) {
@@ -229,6 +348,7 @@ Opcode Parser::mapOpcode(const std::string& txt) {
         {"local.get", Opcode::LOCAL_GET},
         {"local.set", Opcode::LOCAL_SET},
         {"call", Opcode::CALL},
+        {"call_indirect", Opcode::CALL_INDIRECT},
         {"return", Opcode::RETURN},
         {"block", Opcode::BLOCK},
         {"loop", Opcode::LOOP},
