@@ -24,6 +24,9 @@ private:
     void parseTopLevel(Module& mod);
     Import parseImport();
     Function parseFunc();
+    Type parseType();
+    Table parseTable();
+    ElementSegment parseElem();
     void parseInstruction(std::vector<Instruction>& out);
 
     bool takesImmediate(Opcode op);
