@@ -63,6 +63,9 @@ private:
     std::unordered_map<std::string, HostFuncEntry> hostFuncs;
     std::unordered_map<std::string, int32_t> stringHandles;
 
+    // Table
+    std::vector<Function*> table;
+
     void push(WasmValue v);
     WasmValue pop();
 
@@ -71,4 +74,5 @@ private:
     void execute(Instruction& instr, StackFrame& frame);
 
     int resolveLocal(const std::string& id, Function* func);
+    Type* resolveType(const std::string& alias);
 };

@@ -61,6 +61,15 @@ void Parser::parseTopLevel(Module& mod) {
             }
             mod.strings.push_back(strDef);
             expect(TokenType::RPAREN);
+        } else if (fieldName.text == "type") {
+            consume();
+            mod.types.push_back(parseType());
+        } else if (fieldName.text == "table") {
+            consume();
+            mod.tables.push_back(parseTable());
+        } else if (fieldName.text == "elem") {
+            consume();
+            mod.elements.push_back(parseElem());
         } else {
             pos = checkpoint + 1;
             skipSExpr();
@@ -132,6 +141,80 @@ Function Parser::parseFunc() {
     return func;
 }
 
+Type Parser::parseType() {
+    Type t;
+    if (peek().type == TokenType::IDENTIFIER) {
+        std::string raw = consume().text;
+        if (!raw.empty() && raw[0] == '$') raw = raw.substr(1);
+        t.alias = raw;
+    }
+    expect(TokenType::LPAREN);
+    Token funcKwd = consume();
+    if (funcKwd.text != "func") throw std::runtime_error("Expected 'func' in type definition");
+
+    while (peek().type != TokenType::RPAREN) {
+        expect(TokenType::LPAREN);
+        Token inner = consume();
+        if (inner.text == "param") {
+            while (peek().type != TokenType::RPAREN) {
+                if (peek().type == TokenType::IDENTIFIER) {
+                    consume(); // skip name if present
+                }
+                if (peek().type == TokenType::KEYWORD) {
+                    t.paramTypes.push_back(consume().text);
+                }
+            }
+            expect(TokenType::RPAREN);
+        } else if (inner.text == "result") {
+            while (peek().type != TokenType::RPAREN) {
+                t.resultTypes.push_back(consume().text);
+            }
+            expect(TokenType::RPAREN);
+        }
+    }
+    expect(TokenType::RPAREN); // close func
+    expect(TokenType::RPAREN); // close type
+    return t;
+}
+
+Table Parser::parseTable() {
+    Table t = {0, 0};
+    if (peek().type == TokenType::INTEGER) {
+        t.min = std::stoi(consume().text);
+    }
+    if (peek().type == TokenType::INTEGER) {
+        t.max = std::stoi(consume().text);
+    }
+    Token type = consume();
+    if (type.text != "funcref") {
+        throw std::runtime_error("Table elements must be funcref");
+    }
+    expect(TokenType::RPAREN);
+    return t;
+}
+
+ElementSegment Parser::parseElem() {
+    ElementSegment es;
+    expect(TokenType::LPAREN);
+    Token constOp = consume();
+    if (constOp.text != "i32.const") throw std::runtime_error("Expected i32.const for elem offset");
+    Token offsetVal = consume();
+    if (offsetVal.type != TokenType::INTEGER) throw std::runtime_error("Expected integer offset");
+    es.offset = std::stoi(offsetVal.text);
+    expect(TokenType::RPAREN);
+
+    while (peek().type != TokenType::RPAREN) {
+        Token func = consume();
+        if (func.type == TokenType::IDENTIFIER) {
+            std::string name = func.text;
+            if (!name.empty() && name[0] == '$') name = name.substr(1);
+            es.funcNames.push_back(name);
+        }
+    }
+    expect(TokenType::RPAREN);
+    return es;
+}
+
 void Parser::parseInstruction(std::vector<Instruction>& out) {
     if (peek().type == TokenType::LPAREN) {
         // Folded: (opcode arg1 arg2)
@@ -189,6 +272,7 @@ bool Parser::takesImmediate(Opcode op) {
         case Opcode::BR:
         case Opcode::BR_IF:
         case Opcode::CALL:
+        case Opcode::CALL_INDIRECT: // Needs immediate
         case Opcode::BLOCK:
         case Opcode::LOOP:
         case Opcode::STRING_CONST:
@@ -199,6 +283,26 @@ bool Parser::takesImmediate(Opcode op) {
 }
 
 Instruction Parser::parseImmediate(Opcode op) {
+    if (op == Opcode::CALL_INDIRECT) {
+        // syntax: (call_indirect (type $T) ...index...)
+        // parseImmediate is called right after consuming 'call_indirect'
+        // Next token should be '(' for (type $T)
+        // BUT wait, `takesImmediate` returns true, so `parseImmediate` is called.
+        // It should handle `(type $T)`.
+
+        expect(TokenType::LPAREN);
+        Token typeKwd = consume();
+        if (typeKwd.text != "type") throw std::runtime_error("Expected (type ...) in call_indirect");
+        Token typeName = consume();
+        if (typeName.type != TokenType::IDENTIFIER) throw std::runtime_error("Expected type identifier");
+        std::string t = typeName.text;
+        if (!t.empty() && t[0] == '$') t = t.substr(1);
+        expect(TokenType::RPAREN);
+
+        // Return instruction with the type alias as operand
+        return Instruction(op, t);
+    }
+
     Token t = consume();
     if (op == Opcode::I32_CONST) return Instruction(op, (int32_t)std::stoi(t.text));
     if (op == Opcode::I64_CONST) return Instruction(op, (int64_t)std::stoll(t.text));
@@ -229,6 +333,7 @@ Opcode Parser::mapOpcode(const std::string& txt) {
         {"local.get", Opcode::LOCAL_GET},
         {"local.set", Opcode::LOCAL_SET},
         {"call", Opcode::CALL},
+        {"call_indirect", Opcode::CALL_INDIRECT},
         {"return", Opcode::RETURN},
         {"block", Opcode::BLOCK},
         {"loop", Opcode::LOOP},

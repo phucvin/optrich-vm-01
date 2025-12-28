@@ -26,15 +26,30 @@ Interpreter::Interpreter(Module& mod, MemoryStore& store) : module(mod), store(s
         int32_t handle = store.alloc_readonly(data);
         stringHandles[strDef.name] = handle;
     }
+
+    // Initialize Table
+    if (!module.tables.empty()) {
+        table.resize(module.tables[0].min, nullptr); // Support only one table for now
+    }
+
+    for (const auto& elem : module.elements) {
+        int offset = elem.offset;
+        for (size_t i = 0; i < elem.funcNames.size(); ++i) {
+            std::string funcName = elem.funcNames[i];
+            if (funcMap.find(funcName) != funcMap.end()) {
+                size_t funcIndex = funcMap[funcName];
+                if (offset + i < table.size()) {
+                    table[offset + i] = &module.functions[funcIndex];
+                }
+            }
+        }
+    }
 }
 
 void Interpreter::registerHostFunction(std::string modName, std::string fieldName, HostFunction func,
                                        const std::vector<std::string>& params,
                                        const std::vector<std::string>& results) {
     // Scan module imports to see if this host function is needed
-    // In a real generic runtime, we might store this in a registry and link on instantiation.
-    // But here we are given the module at construction, so we can link immediately.
-
     int importIndex = 0;
     for (const auto& imp : module.imports) {
         if (imp.module == modName && imp.field == fieldName) {
@@ -56,18 +71,10 @@ void Interpreter::registerHostFunction(std::string modName, std::string fieldNam
             if (!imp.alias.empty()) {
                 hostFuncs[imp.alias] = entry;
             }
-            // Link by index (stringify import index)
-            // Note: In standard WASM, function index space starts with imports.
-            // If we want to support `call 0`, we need to map "0" -> this host func.
             hostFuncs[std::to_string(importIndex)] = entry;
         }
         importIndex++;
     }
-
-    // If not found in imports, we might still want to register it if the user manually constructed
-    // the module or expects to use it otherwise?
-    // But without an alias in the module, the code can't call it easily unless we just store it somewhere.
-    // For this task, we focus on satisfying the declared imports.
 }
 
 WasmValue Interpreter::run(std::string funcName, std::vector<WasmValue> args) {
@@ -243,6 +250,53 @@ void Interpreter::execute(Instruction& instr, StackFrame& frame) {
             }
             break;
         }
+        case Opcode::CALL_INDIRECT: {
+            // Operand is the type alias string
+            std::string typeAlias = std::get<std::string>(instr.operand);
+            Type* expectedType = resolveType(typeAlias);
+            if (!expectedType) {
+                throw std::runtime_error("Unknown type: " + typeAlias);
+            }
+
+            // Pop index
+            int32_t idx = pop().i32;
+
+            // Check bounds
+            if (idx < 0 || idx >= (int32_t)table.size()) {
+                throw std::runtime_error("undefined element: " + std::to_string(idx));
+            }
+
+            Function* callee = table[idx];
+            if (!callee) {
+                throw std::runtime_error("uninitialized element " + std::to_string(idx));
+            }
+
+            // Check signature
+            if (callee->paramTypes != expectedType->paramTypes || callee->resultTypes != expectedType->resultTypes) {
+                throw std::runtime_error("indirect call signature mismatch");
+            }
+
+            // Execute call (same as CALL)
+            StackFrame newFrame;
+            newFrame.func = callee;
+            newFrame.pc = 0;
+            newFrame.returnHeight = valueStack.size() - callee->paramTypes.size();
+
+            size_t nargs = callee->paramTypes.size();
+            std::vector<WasmValue> args(nargs);
+            for(int i = nargs-1; i>=0; --i) {
+                args[i] = pop();
+            }
+            for(auto& a : args) newFrame.locals.push_back(a);
+
+            for(const auto& lt : callee->localTypes) {
+                (void)lt;
+                newFrame.locals.push_back(WasmValue((int32_t)0));
+            }
+
+            callStack.push_back(newFrame);
+            break;
+        }
         case Opcode::I32_EQ: {
             int32_t b = pop().i32;
             int32_t a = pop().i32;
@@ -282,7 +336,6 @@ void Interpreter::execute(Instruction& instr, StackFrame& frame) {
         case Opcode::BLOCK:
         case Opcode::LOOP:
         case Opcode::END:
-            // Just structural markers in flat mode
             break;
         case Opcode::BR:
         case Opcode::BR_IF: {
@@ -294,20 +347,13 @@ void Interpreter::execute(Instruction& instr, StackFrame& frame) {
 
             if (shouldJump) {
                 std::string label = std::get<std::string>(instr.operand);
-                // Scan for label
-                // 1. Scan backwards for LOOP
-                int scanPC = frame.pc - 1; // start from current instruction
+                int scanPC = frame.pc - 1;
                 bool found = false;
                 while (scanPC >= 0) {
                     Instruction& scanInstr = frame.func->body[scanPC];
                     if (scanInstr.opcode == Opcode::LOOP &&
                         std::holds_alternative<std::string>(scanInstr.operand) &&
                         std::get<std::string>(scanInstr.operand) == label) {
-
-                        // Jump to instruction AFTER loop
-                        // Actually, wait. LOOP is just a marker.
-                        // If we jump to loop start, we re-execute LOOP opcode (no-op) and continue.
-                        // Yes.
                         frame.pc = scanPC;
                         found = true;
                         break;
@@ -316,12 +362,6 @@ void Interpreter::execute(Instruction& instr, StackFrame& frame) {
                 }
 
                 if (!found) {
-                    // 2. Scan backwards for BLOCK to find its start?
-                    // No, BR to BLOCK means jump to END of block.
-                    // So we need to find the BLOCK instruction first to know it exists/matches?
-                    // Then find its matching END?
-                    // Actually, we just need to find the BLOCK with that label.
-                    // Scan backwards.
                     scanPC = frame.pc - 1;
                     int blockPC = -1;
                     while (scanPC >= 0) {
@@ -336,8 +376,6 @@ void Interpreter::execute(Instruction& instr, StackFrame& frame) {
                     }
 
                     if (blockPC != -1) {
-                        // Found the block start. Now find the matching END.
-                        // Scan forward from blockPC.
                         int depth = 0;
                         int forwardPC = blockPC;
                         while (forwardPC < (int)frame.func->body.size()) {
@@ -347,8 +385,7 @@ void Interpreter::execute(Instruction& instr, StackFrame& frame) {
                             } else if (fInstr.opcode == Opcode::END) {
                                 depth--;
                                 if (depth == 0) {
-                                    // Found matching END
-                                    frame.pc = forwardPC + 1; // Execute instruction AFTER end
+                                    frame.pc = forwardPC + 1;
                                     found = true;
                                     break;
                                 }
@@ -372,13 +409,18 @@ void Interpreter::execute(Instruction& instr, StackFrame& frame) {
 int Interpreter::resolveLocal(const std::string& id, Function* func) {
     if (isdigit(id[0])) return std::stoi(id);
 
-    // Check params
     for(size_t i=0; i<func->paramNames.size(); ++i) {
         if (func->paramNames[i] == id) return i;
     }
-    // Check locals
     for(size_t i=0; i<func->localNames.size(); ++i) {
         if (func->localNames[i] == id) return func->paramNames.size() + i;
     }
     throw std::runtime_error("Unknown local: " + id);
+}
+
+Type* Interpreter::resolveType(const std::string& alias) {
+    for (auto& t : module.types) {
+        if (t.alias == alias) return &t;
+    }
+    return nullptr;
 }
