@@ -29,19 +29,20 @@ Interpreter::Interpreter(Module& mod, MemoryStore& store) : module(mod), store(s
 
     // Initialize Table
     if (!module.tables.empty()) {
-        table.resize(module.tables[0].min, nullptr); // Support only one table for now
+        const auto& tbl = module.tables[0];
+        table.resize(tbl.min);
     }
-
     for (const auto& elem : module.elements) {
-        int offset = elem.offset;
-        for (size_t i = 0; i < elem.funcNames.size(); ++i) {
-            std::string funcName = elem.funcNames[i];
-            if (funcMap.find(funcName) != funcMap.end()) {
-                size_t funcIndex = funcMap[funcName];
-                if (offset + i < table.size()) {
-                    table[offset + i] = &module.functions[funcIndex];
-                }
-            }
+        // Evaluate offset (simplistic: assume i32.const)
+        int32_t offset = 0;
+        if (elem.offset.opcode == Opcode::I32_CONST) {
+             offset = std::get<int32_t>(elem.offset.operand);
+        }
+
+        for (size_t i = 0; i < elem.functionNames.size(); ++i) {
+             if (offset + i < table.size()) {
+                 table[offset + i] = elem.functionNames[i];
+             }
         }
     }
 }
@@ -251,50 +252,58 @@ void Interpreter::execute(Instruction& instr, StackFrame& frame) {
             break;
         }
         case Opcode::CALL_INDIRECT: {
-            // Operand is the type alias string
-            std::string typeAlias = std::get<std::string>(instr.operand);
-            Type* expectedType = resolveType(typeAlias);
-            if (!expectedType) {
-                throw std::runtime_error("Unknown type: " + typeAlias);
-            }
-
-            // Pop index
+            // Operand is the TYPE name
+            std::string typeName = std::get<std::string>(instr.operand);
             int32_t idx = pop().i32;
 
-            // Check bounds
             if (idx < 0 || idx >= (int32_t)table.size()) {
-                throw std::runtime_error("undefined element: " + std::to_string(idx));
+                throw std::runtime_error("Undefined table index: " + std::to_string(idx));
+            }
+            std::string funcName = table[idx];
+            if (funcName.empty()) {
+                throw std::runtime_error("Uninitialized table element at index " + std::to_string(idx));
             }
 
-            Function* callee = table[idx];
-            if (!callee) {
-                throw std::runtime_error("uninitialized element " + std::to_string(idx));
+            // Resolve Type
+            Type* expectedType = resolveType(typeName);
+            if (!expectedType) {
+                 throw std::runtime_error("Unknown type: " + typeName);
             }
 
-            // Check signature
-            if (callee->paramTypes != expectedType->paramTypes || callee->resultTypes != expectedType->resultTypes) {
-                throw std::runtime_error("indirect call signature mismatch");
+            // Check if function exists
+            if (funcMap.count(funcName)) {
+                 size_t fIdx = funcMap[funcName];
+                 Function* callee = &module.functions[fIdx];
+
+                 // Check Signature
+                 if (callee->paramTypes != expectedType->paramTypes) {
+                     throw std::runtime_error("Indirect call signature mismatch (params)");
+                 }
+                 if (callee->resultTypes != expectedType->resultTypes) {
+                     throw std::runtime_error("Indirect call signature mismatch (results)");
+                 }
+
+                 // Perform Call
+                 StackFrame newFrame;
+                 newFrame.func = callee;
+                 newFrame.pc = 0;
+                 newFrame.returnHeight = valueStack.size() - callee->paramTypes.size();
+
+                 size_t nargs = callee->paramTypes.size();
+                 std::vector<WasmValue> args(nargs);
+                 for(int i = nargs-1; i>=0; --i) {
+                     args[i] = pop();
+                 }
+                 for(auto& a : args) newFrame.locals.push_back(a);
+
+                 for(const auto& lt : callee->localTypes) {
+                     (void)lt;
+                     newFrame.locals.push_back(WasmValue((int32_t)0));
+                 }
+                 callStack.push_back(newFrame);
+            } else {
+                 throw std::runtime_error("Unknown function in table: " + funcName);
             }
-
-            // Execute call (same as CALL)
-            StackFrame newFrame;
-            newFrame.func = callee;
-            newFrame.pc = 0;
-            newFrame.returnHeight = valueStack.size() - callee->paramTypes.size();
-
-            size_t nargs = callee->paramTypes.size();
-            std::vector<WasmValue> args(nargs);
-            for(int i = nargs-1; i>=0; --i) {
-                args[i] = pop();
-            }
-            for(auto& a : args) newFrame.locals.push_back(a);
-
-            for(const auto& lt : callee->localTypes) {
-                (void)lt;
-                newFrame.locals.push_back(WasmValue((int32_t)0));
-            }
-
-            callStack.push_back(newFrame);
             break;
         }
         case Opcode::I32_EQ: {
@@ -418,9 +427,9 @@ int Interpreter::resolveLocal(const std::string& id, Function* func) {
     throw std::runtime_error("Unknown local: " + id);
 }
 
-Type* Interpreter::resolveType(const std::string& alias) {
+Type* Interpreter::resolveType(const std::string& name) {
     for (auto& t : module.types) {
-        if (t.alias == alias) return &t;
+        if (t.name == name) return &t;
     }
     return nullptr;
 }

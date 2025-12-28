@@ -45,6 +45,7 @@ struct Instruction {
     Opcode opcode;
     std::variant<int32_t, int64_t, float, double, std::string> operand;
 
+    Instruction() : opcode(Opcode::NOP), operand(0) {} // Default constructor
     Instruction(Opcode op);
     Instruction(Opcode op, int32_t val);
     Instruction(Opcode op, int64_t val);
@@ -77,21 +78,22 @@ struct StringDefinition {
     std::string value;
 };
 
-// New structs
 struct Type {
-    std::string alias;
+    std::string name;
     std::vector<std::string> paramTypes;
     std::vector<std::string> resultTypes;
 };
 
 struct Table {
-    int32_t min;
-    int32_t max;
+    std::string name; // Usually empty or "0" for MVP, but can be named
+    uint32_t min;
+    uint32_t max;
 };
 
 struct ElementSegment {
-    int32_t offset;
-    std::vector<std::string> funcNames;
+    uint32_t tableIndex;
+    Instruction offset; // Expression to calculate offset (usually i32.const)
+    std::vector<std::string> functionNames;
 };
 
 struct Module {
