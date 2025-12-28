@@ -37,43 +37,31 @@
 
     ;; Copy string 1
     (local.set $i (i32.const 0))
-    block $break1
-      loop $loop1
-        local.get $i
-        local.get $len1
-        i32.ge_s
-        br_if $break1
+    (block $break1
+      (loop $loop1
+        (br_if $break1 (i32.ge_s (local.get $i) (local.get $len1)))
 
         (call $set (local.get $h3) (local.get $i) (call $get (local.get $h1) (local.get $i)))
 
-        local.get $i
-        i32.const 1
-        i32.add
-        local.set $i
+        (local.set $i (i32.add (local.get $i) (i32.const 1)))
 
-        br $loop1
-      end
-    end
+        (br $loop1)
+      )
+    )
 
     ;; Copy string 2
     (local.set $i (i32.const 0))
-    block $break2
-      loop $loop2
-        local.get $i
-        local.get $len2
-        i32.ge_s
-        br_if $break2
+    (block $break2
+      (loop $loop2
+        (br_if $break2 (i32.ge_s (local.get $i) (local.get $len2)))
 
         (call $set (local.get $h3) (i32.add (local.get $len1) (local.get $i)) (call $get (local.get $h2) (local.get $i)))
 
-        local.get $i
-        i32.const 1
-        i32.add
-        local.set $i
+        (local.set $i (i32.add (local.get $i) (i32.const 1)))
 
-        br $loop2
-      end
-    end
+        (br $loop2)
+      )
+    )
 
     (local.get $h3)
   )
@@ -85,23 +73,16 @@
     (local.set $len (call $length (local.get $handle)))
     (local.set $i (i32.const 0))
 
-    block $break
-      loop $loop
-        local.get $i
-        local.get $len
-        i32.ge_s
-        br_if $break
+    (block $break
+      (loop $loop
+        (br_if $break (i32.ge_s (local.get $i) (local.get $len)))
 
-        (call $get (local.get $handle) (local.get $i))
-        call $putchar
+        (call $putchar (call $get (local.get $handle) (local.get $i)))
 
-        local.get $i
-        i32.const 1
-        i32.add
-        local.set $i
+        (local.set $i (i32.add (local.get $i) (i32.const 1)))
 
-        br $loop
-      end
-    end
+        (br $loop)
+      )
+    )
   )
 )
