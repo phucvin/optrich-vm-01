@@ -57,8 +57,15 @@
     )
   )
 
-  ;; Move function taking interface (itab, data)
-  (func $move (param $itab i32) (param $data i32)
+  ;; Move function taking interface (handle containing itab + data)
+  (func $move (param $iface i32)
+    (local $itab i32)
+    (local $data i32)
+    ;; Unpack itab (offset 0)
+    (local.set $itab (call $read_i32 (local.get $iface) (i32.const 0)))
+    ;; Unpack data (offset 4)
+    (local.set $data (call $read_i32 (local.get $iface) (i32.const 4)))
+
     (call $dispatch_run (local.get $itab) (local.get $data))
   )
 
@@ -67,6 +74,8 @@
     (local $bike_itab i32)
     (local $car_inst i32)
     (local $bike_inst i32)
+    (local $car_iface i32)
+    (local $bike_iface i32)
 
     ;; Setup Car VTable (ID 100)
     (local.set $car_itab (call $alloc (i32.const 4)))
@@ -80,15 +89,25 @@
     (local.set $car_inst (call $alloc (i32.const 4)))
     (call $car_set_v1 (local.get $car_inst) (i32.const 1))
 
+    ;; Create Car Interface (itab, inst)
+    (local.set $car_iface (call $alloc (i32.const 8)))
+    (call $write_i32 (local.get $car_iface) (i32.const 0) (local.get $car_itab))
+    (call $write_i32 (local.get $car_iface) (i32.const 4) (local.get $car_inst))
+
     ;; Move Car
-    (call $move (local.get $car_itab) (local.get $car_inst))
+    (call $move (local.get $car_iface))
 
     ;; Create Bike, v2=2
     (local.set $bike_inst (call $alloc (i32.const 4)))
     (call $bike_set_v2 (local.get $bike_inst) (i32.const 2))
 
+    ;; Create Bike Interface (itab, inst)
+    (local.set $bike_iface (call $alloc (i32.const 8)))
+    (call $write_i32 (local.get $bike_iface) (i32.const 0) (local.get $bike_itab))
+    (call $write_i32 (local.get $bike_iface) (i32.const 4) (local.get $bike_inst))
+
     ;; Move Bike
-    (call $move (local.get $bike_itab) (local.get $bike_inst))
+    (call $move (local.get $bike_iface))
 
     (call $putchar (i32.const 10)) ;; newline
 
