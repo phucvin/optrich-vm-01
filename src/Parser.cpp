@@ -308,6 +308,7 @@ bool Parser::takesImmediate(Opcode op) {
         case Opcode::BR:
         case Opcode::BR_IF:
         case Opcode::CALL:
+        case Opcode::CALL_INDIRECT: // Needs immediate
         case Opcode::BLOCK:
         case Opcode::LOOP:
         case Opcode::STRING_CONST:
@@ -318,6 +319,26 @@ bool Parser::takesImmediate(Opcode op) {
 }
 
 Instruction Parser::parseImmediate(Opcode op) {
+    if (op == Opcode::CALL_INDIRECT) {
+        // syntax: (call_indirect (type $T) ...index...)
+        // parseImmediate is called right after consuming 'call_indirect'
+        // Next token should be '(' for (type $T)
+        // BUT wait, `takesImmediate` returns true, so `parseImmediate` is called.
+        // It should handle `(type $T)`.
+
+        expect(TokenType::LPAREN);
+        Token typeKwd = consume();
+        if (typeKwd.text != "type") throw std::runtime_error("Expected (type ...) in call_indirect");
+        Token typeName = consume();
+        if (typeName.type != TokenType::IDENTIFIER) throw std::runtime_error("Expected type identifier");
+        std::string t = typeName.text;
+        if (!t.empty() && t[0] == '$') t = t.substr(1);
+        expect(TokenType::RPAREN);
+
+        // Return instruction with the type alias as operand
+        return Instruction(op, t);
+    }
+
     Token t = consume();
     if (op == Opcode::I32_CONST) return Instruction(op, (int32_t)std::stoi(t.text));
     if (op == Opcode::I64_CONST) return Instruction(op, (int64_t)std::stoll(t.text));

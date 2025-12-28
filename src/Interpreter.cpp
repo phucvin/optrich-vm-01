@@ -51,9 +51,6 @@ void Interpreter::registerHostFunction(std::string modName, std::string fieldNam
                                        const std::vector<std::string>& params,
                                        const std::vector<std::string>& results) {
     // Scan module imports to see if this host function is needed
-    // In a real generic runtime, we might store this in a registry and link on instantiation.
-    // But here we are given the module at construction, so we can link immediately.
-
     int importIndex = 0;
     for (const auto& imp : module.imports) {
         if (imp.module == modName && imp.field == fieldName) {
@@ -75,18 +72,10 @@ void Interpreter::registerHostFunction(std::string modName, std::string fieldNam
             if (!imp.alias.empty()) {
                 hostFuncs[imp.alias] = entry;
             }
-            // Link by index (stringify import index)
-            // Note: In standard WASM, function index space starts with imports.
-            // If we want to support `call 0`, we need to map "0" -> this host func.
             hostFuncs[std::to_string(importIndex)] = entry;
         }
         importIndex++;
     }
-
-    // If not found in imports, we might still want to register it if the user manually constructed
-    // the module or expects to use it otherwise?
-    // But without an alias in the module, the code can't call it easily unless we just store it somewhere.
-    // For this task, we focus on satisfying the declared imports.
 }
 
 WasmValue Interpreter::run(std::string funcName, std::vector<WasmValue> args) {
@@ -356,7 +345,6 @@ void Interpreter::execute(Instruction& instr, StackFrame& frame) {
         case Opcode::BLOCK:
         case Opcode::LOOP:
         case Opcode::END:
-            // Just structural markers in flat mode
             break;
         case Opcode::BR:
         case Opcode::BR_IF: {
@@ -368,20 +356,13 @@ void Interpreter::execute(Instruction& instr, StackFrame& frame) {
 
             if (shouldJump) {
                 std::string label = std::get<std::string>(instr.operand);
-                // Scan for label
-                // 1. Scan backwards for LOOP
-                int scanPC = frame.pc - 1; // start from current instruction
+                int scanPC = frame.pc - 1;
                 bool found = false;
                 while (scanPC >= 0) {
                     Instruction& scanInstr = frame.func->body[scanPC];
                     if (scanInstr.opcode == Opcode::LOOP &&
                         std::holds_alternative<std::string>(scanInstr.operand) &&
                         std::get<std::string>(scanInstr.operand) == label) {
-
-                        // Jump to instruction AFTER loop
-                        // Actually, wait. LOOP is just a marker.
-                        // If we jump to loop start, we re-execute LOOP opcode (no-op) and continue.
-                        // Yes.
                         frame.pc = scanPC;
                         found = true;
                         break;
@@ -390,12 +371,6 @@ void Interpreter::execute(Instruction& instr, StackFrame& frame) {
                 }
 
                 if (!found) {
-                    // 2. Scan backwards for BLOCK to find its start?
-                    // No, BR to BLOCK means jump to END of block.
-                    // So we need to find the BLOCK instruction first to know it exists/matches?
-                    // Then find its matching END?
-                    // Actually, we just need to find the BLOCK with that label.
-                    // Scan backwards.
                     scanPC = frame.pc - 1;
                     int blockPC = -1;
                     while (scanPC >= 0) {
@@ -410,8 +385,6 @@ void Interpreter::execute(Instruction& instr, StackFrame& frame) {
                     }
 
                     if (blockPC != -1) {
-                        // Found the block start. Now find the matching END.
-                        // Scan forward from blockPC.
                         int depth = 0;
                         int forwardPC = blockPC;
                         while (forwardPC < (int)frame.func->body.size()) {
@@ -421,8 +394,7 @@ void Interpreter::execute(Instruction& instr, StackFrame& frame) {
                             } else if (fInstr.opcode == Opcode::END) {
                                 depth--;
                                 if (depth == 0) {
-                                    // Found matching END
-                                    frame.pc = forwardPC + 1; // Execute instruction AFTER end
+                                    frame.pc = forwardPC + 1;
                                     found = true;
                                     break;
                                 }
@@ -446,11 +418,9 @@ void Interpreter::execute(Instruction& instr, StackFrame& frame) {
 int Interpreter::resolveLocal(const std::string& id, Function* func) {
     if (isdigit(id[0])) return std::stoi(id);
 
-    // Check params
     for(size_t i=0; i<func->paramNames.size(); ++i) {
         if (func->paramNames[i] == id) return i;
     }
-    // Check locals
     for(size_t i=0; i<func->localNames.size(); ++i) {
         if (func->localNames[i] == id) return func->paramNames.size() + i;
     }
