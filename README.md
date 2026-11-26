@@ -22,7 +22,7 @@ Optrich VM is a lightweight, dependency-free C++ implementation of a WebAssembly
 
 The project is split into header files (`include/`) and source files (`src/`):
 
-*   **`MemoryStore`:** Manages memory allocations. Unlike standard Wasm linear memory, this uses a handle-based system where `alloc` returns a handle ID, and `read/write` take (handle, offset).
+*   **`MemoryStore`:** Manages memory allocations. Unlike standard Wasm linear memory, this uses a handle-based system where `alloc` returns a handle ID, `make_span` creates zero-copy sub-views, and `read/write` take `(handle, offset)`. See [docs/memory-model.md](docs/memory-model.md) for design background, related industry models (CHERI, MS-Wasm, Java `MemorySegment`, etc.), and tradeoffs.
 *   **`Parser`:** recursive descent parser for WAT S-expressions.
 *   **`Interpreter`:** The execution engine. It maintains the stack and executes opcodes.
 *   **`AST`:** Definitions for Module, Function, Instruction, etc.
