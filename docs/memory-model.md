@@ -29,7 +29,7 @@ Optrich VM targets the middle ground: **untyped byte layouts combined with capab
 Pushing this model beyond a prototype involves three core tradeoffs:
 
 1. **Performance:** Handle-table lookups plus bounds and permission checks on every read/write are costly in an interpreter. Achieving near-native speed requires either a JIT that hoists and eliminates redundant checks (like HotSpot for `MemorySegment`) or hardware capability support (like CHERI).
-2. **Lifetimes & Deallocation (`free`):** Once allocations can be freed, `make_span` introduces aliased views that must remain temporally safe. Solving this requires choosing a reclamation strategy such as reference counting, arenas/regions (like Panama's `Arena`), generational handles, or tracing GC.
+2. **Lifetimes & Deallocation (`free`):** Once allocations can be freed, `make_span` introduces aliased views that must remain temporally safe. Solving this requires choosing a reclamation strategy such as reference counting, arenas/regions (like Panama's `Arena`), generational handles, or tracing GC (see [docs/gc.md](gc.md)).
 3. **Isolation & Unforgeability:** While this prototype represents handles as plain `i32` values for simplicity, true cross-module isolation requires opaque, unforgeable handle types (similar to `externref` or per-module handle tables).
 4. **Compiler Targets:** Standard LLVM backends assume pointers are plain integers in a flat address space, so targeting a pure handle+offset VM typically requires either a custom language frontend or a capability-aware compiler backend (such as CHERI-LLVM).
 
