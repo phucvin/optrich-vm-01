@@ -32,3 +32,23 @@ Pushing this model beyond a prototype involves three core tradeoffs:
 2. **Lifetimes & Deallocation (`free`):** Once allocations can be freed, `make_span` introduces aliased views that must remain temporally safe. Solving this requires choosing a reclamation strategy such as reference counting, arenas/regions (like Panama's `Arena`), generational handles, or tracing GC.
 3. **Isolation & Unforgeability:** While this prototype represents handles as plain `i32` values for simplicity, true cross-module isolation requires opaque, unforgeable handle types (similar to `externref` or per-module handle tables).
 4. **Compiler Targets:** Standard LLVM backends assume pointers are plain integers in a flat address space, so targeting a pure handle+offset VM typically requires either a custom language frontend or a capability-aware compiler backend (such as CHERI-LLVM).
+
+## Performance: Interpreter & JIT
+
+With the right internal representation, this model can perform well in both an interpreter and a JIT/AOT compiler (as demonstrated by Java's `MemorySegment` and Rust slices), and can outperform standard Wasm Component Model ABIs on multi-module zero-copy workloads.
+
+### Making It Fast in an Interpreter
+* **Native memory opcodes:** Make `read`/`write`/`span` first-class VM opcodes rather than host function calls (avoiding per-access `std::function` dispatch and argument-vector allocations).
+* **Fat handles on the value stack:** Carry `{ uint8_t* ptr; uint32_t size; uint32_t flags; }` directly on the operand stack so accesses perform a single bounds check and direct load instead of a handle-table lookup.
+* **Static read-only types:** Encoding `ro_handle` vs. `rw_handle` in the type system eliminates runtime write-permission checks.
+* **Bulk opcodes & pre-resolution:** Adding `mem.copy`/`mem.fill`/`mem.cmp` amortizes dispatch and bounds checks; pre-resolving local/function/branch targets plus threaded dispatch keeps interpreter overhead low.
+
+### Making It Fast in a JIT / AOT Compiler
+* **Scalar replacement (unboxing):** Keep `(ptr, size)` in CPU registers rather than in a handle table or memory struct.
+* **Loop-Invariant Code Motion (LICM) & Range Check Elimination (RCE):** For loops over `handle[0..n]`, check `n <= handle.size` (and write permission) once before the loop and emit unchecked native loads/stores inside the loop.
+* **Zero-copy cross-module calls:** Passing a span across module boundaries passes `(ptr, size)` in registers without copying.
+
+### Where Flat Linear Memory Still Has an Edge
+* **Random / data-dependent accesses:** Standard 64-bit Wasm JITs use 4–8 GiB MMU guard pages for 0-instruction bounds checks even on unpredictable offsets. Discrete objects/spans cannot use per-object guard pages, so random accesses pay ~1–2 instructions (compare + branch), though branch prediction keeps the overhead modest.
+* **Handles stored in memory:** Storing 16-byte fat pointers inside structs reduces cache density, while storing compact 32-bit handle IDs requires a table lookup on dereference.
+* **Temporal safety (`free` + `make_span`):** Arena-scoped lifetimes (like Panama's `Arena`) or tracing GC allow a JIT to safely hoist checks across loops. Arbitrary manual `free()` while spans exist forces liveness/generation re-checks across calls and inhibits aggressive optimization.
